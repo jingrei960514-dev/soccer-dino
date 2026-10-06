@@ -1,0 +1,4 @@
+# 所有文字檔一律用 LF 換行。
+# make_game_notebook.py 和 clear_outputs.py 寫檔時都用 LF，
+# 如果 git 在 Windows 上取出時換成 CRLF，每次產生 notebook 都會多出一堆只有換行不同的差異
+* text=auto eol=lf

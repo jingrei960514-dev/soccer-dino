@@ -1,0 +1,8 @@
+# Python 執行時自動產生的快取，每台電腦都不一樣
+__pycache__/
+
+# Jupyter 自動儲存的備份
+.ipynb_checkpoints/
+
+# VS Code 的個人設定
+.vscode/

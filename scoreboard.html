@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>足球小恐龍排行榜</title>
+<!--
+	官方比賽的計分板。用瀏覽器直接打開這個檔案就能用，不需要網路。
+	助教輸入名字和分數，按 Enter 加入，名單會自動由高到低排序，前三名放大顯示。
+	資料存在這台電腦的瀏覽器裡（localStorage），不小心重新整理或關掉也不會消失；
+	換一台電腦或換一個瀏覽器就看不到，所以比賽結束後記得按「下載 CSV」留存。
+	投影時按 F11 可以全螢幕。
+-->
+<style>
+	/* 顏色集中在這裡，要換配色只改這一段 */
+	:root {
+		--background: #0f3d22;
+		--panel: #165a32;
+		--panel-light: #1d6e3e;
+		--text: #ffffff;
+		--muted: #b9dcc4;
+		--gold: #ffd23f;
+		--silver: #d9dee3;
+		--bronze: #e39a5b;
+		--danger: #ff7b7b;
+	}
+
+	* {
+		box-sizing: border-box;
+	}
+
+	body {
+		margin: 0;
+		padding: 24px 32px 48px;
+		background: var(--background);
+		color: var(--text);
+		/* 依序嘗試這些字型，Windows 用微軟正黑體，Mac 用蘋方 */
+		font-family: 'Microsoft JhengHei', 'PingFang TC', 'Noto Sans TC', sans-serif;
+	}
+
+	h1 {
+		margin: 0 0 20px;
+		font-size: 56px;
+		text-align: center;
+		letter-spacing: 4px;
+	}
+
+	.badge {
+		display: inline-block;
+		margin-left: 16px;
+		padding: 4px 16px;
+		border-radius: 8px;
+		background: var(--gold);
+		color: #2a2000;
+		font-size: 28px;
+		vertical-align: middle;
+		letter-spacing: 0;
+	}
+
+	/* ===== 輸入區 ===== */
+	.entry {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 12px;
+		justify-content: center;
+		margin-bottom: 12px;
+	}
+
+	.entry input {
+		padding: 10px 16px;
+		border: 3px solid var(--panel-light);
+		border-radius: 10px;
+		background: var(--panel);
+		color: var(--text);
+		font-size: 28px;
+		font-family: inherit;
+	}
+
+	.entry input:focus {
+		border-color: var(--gold);
+		outline: none;
+	}
+
+	#name-input {
+		width: 320px;
+	}
+
+	#score-input {
+		width: 200px;
+	}
+
+	button {
+		padding: 10px 24px;
+		border: none;
+		border-radius: 10px;
+		background: var(--gold);
+		color: #2a2000;
+		font-size: 28px;
+		font-family: inherit;
+		font-weight: bold;
+		cursor: pointer;
+	}
+
+	button.secondary {
+		background: var(--panel-light);
+		color: var(--text);
+		font-size: 20px;
+		font-weight: normal;
+	}
+
+	.message {
+		min-height: 32px;
+		margin-bottom: 16px;
+		color: var(--muted);
+		font-size: 22px;
+		text-align: center;
+	}
+
+	/* ===== 前三名 ===== */
+	.podium {
+		display: flex;
+		gap: 20px;
+		justify-content: center;
+		align-items: flex-end;
+		margin-bottom: 28px;
+	}
+
+	.podium-card {
+		flex: 1;
+		max-width: 360px;
+		padding: 20px 16px;
+		border-radius: 16px;
+		background: var(--panel);
+		text-align: center;
+		border-top: 10px solid var(--rank-color);
+	}
+
+	/* 第一名放中間、最高；用 order 改變顯示順序，HTML 裡的順序還是 1、2、3 */
+	.podium-card.rank-1 {
+		--rank-color: var(--gold);
+		order: 2;
+		padding-top: 36px;
+		padding-bottom: 36px;
+	}
+
+	.podium-card.rank-2 {
+		--rank-color: var(--silver);
+		order: 1;
+	}
+
+	.podium-card.rank-3 {
+		--rank-color: var(--bronze);
+		order: 3;
+	}
+
+	.podium-rank {
+		color: var(--rank-color);
+		font-size: 36px;
+		font-weight: bold;
+	}
+
+	.podium-name {
+		margin: 8px 0;
+		font-size: 44px;
+		font-weight: bold;
+		word-break: break-all;
+	}
+
+	.rank-1 .podium-name {
+		font-size: 56px;
+	}
+
+	.podium-score {
+		color: var(--rank-color);
+		font-size: 48px;
+		font-weight: bold;
+	}
+
+	.rank-1 .podium-score {
+		font-size: 64px;
+	}
+
+	/* ===== 第四名以後 ===== */
+	.list {
+		max-width: 960px;
+		margin: 0 auto;
+		padding: 0;
+		list-style: none;
+	}
+
+	.list li {
+		display: flex;
+		align-items: center;
+		gap: 20px;
+		margin-bottom: 8px;
+		padding: 10px 20px;
+		border-radius: 10px;
+		background: var(--panel);
+		font-size: 34px;
+	}
+
+	.list .rank {
+		width: 72px;
+		color: var(--muted);
+		text-align: right;
+	}
+
+	.list .name {
+		flex: 1;
+		word-break: break-all;
+	}
+
+	.list .score {
+		font-weight: bold;
+	}
+
+	/* 刪除鈕平常淡淡的，滑鼠移過去才明顯，投影時才不會搶走注意力 */
+	.delete {
+		padding: 4px 12px;
+		background: transparent;
+		color: var(--muted);
+		font-size: 22px;
+		font-weight: normal;
+		opacity: 0.4;
+	}
+
+	.delete:hover {
+		color: var(--danger);
+		opacity: 1;
+	}
+
+	.podium-card .delete {
+		margin-top: 8px;
+	}
+
+	/* 剛加入或剛更新的那一列閃一下，助教可以確認有沒有輸入成功 */
+	.just-added {
+		animation: flash 1.6s ease-out;
+	}
+
+	@keyframes flash {
+		from {
+			background: var(--gold);
+			color: #2a2000;
+		}
+	}
+
+	.empty {
+		color: var(--muted);
+		font-size: 30px;
+		text-align: center;
+	}
+
+	.tools {
+		display: flex;
+		gap: 12px;
+		justify-content: center;
+		margin-top: 32px;
+	}
+
+	/* 手機或很窄的視窗：前三名改成上下排 */
+	@media (max-width: 720px) {
+		body {
+			padding: 16px;
+		}
+
+		h1 {
+			font-size: 36px;
+		}
+
+		.podium {
+			flex-direction: column;
+			align-items: stretch;
+		}
+
+		.podium-card {
+			max-width: none;
+		}
+
+		.podium-card.rank-1,
+		.podium-card.rank-2,
+		.podium-card.rank-3 {
+			order: 0;
+		}
+
+		#name-input,
+		#score-input {
+			width: 100%;
+		}
+
+		.list li {
+			gap: 10px;
+			padding: 8px 12px;
+			font-size: 24px;
+		}
+
+		.list .rank {
+			width: 36px;
+		}
+	}
+</style>
+</head>
+<body>
+	<h1>足球小恐龍排行榜<span class="badge">官方版本</span></h1>
+
+	<form class="entry" id="entry-form">
+		<input id="name-input" placeholder="名字（例如 #10 小明）" autocomplete="off">
+		<input id="score-input" placeholder="分數" inputmode="numeric" autocomplete="off">
+		<button type="submit">加入</button>
+	</form>
+	<div class="message" id="message"></div>
+
+	<div class="podium" id="podium"></div>
+	<ol class="list" id="list"></ol>
+
+	<div class="tools">
+		<button class="secondary" id="download-button">下載 CSV</button>
+		<button class="secondary" id="clear-button">全部清除</button>
+	</div>
+
+<script>
+	// 存在瀏覽器裡用的名稱；同一台電腦打開這個檔案都會讀到同一份資料
+	const storage_key = 'soccer_dino_scoreboard';
+
+	// 所有紀錄，每一筆是 { name: 名字, score: 分數 }
+	let records = load_records();
+	// 剛加入的名字，畫面更新時讓那一列閃一下
+	let just_added_name = '';
+
+	const name_input = document.getElementById('name-input');
+	const score_input = document.getElementById('score-input');
+	const message = document.getElementById('message');
+
+	// ===== 讀寫瀏覽器的儲存空間 =====
+
+	// 無痕視窗或瀏覽器設定可能不允許儲存，所以讀寫都包在 try 裡，失敗就當作沒有存檔，計分板照常能用
+	function load_records() {
+		try {
+			const text = localStorage.getItem(storage_key);
+			if (text) {
+				return JSON.parse(text);
+			}
+		} catch (error) {
+			show_message('這個瀏覽器不能儲存資料，重新整理後名單會消失，請記得下載 CSV。');
+		}
+		return [];
+	}
+
+	function save_records() {
+		try {
+			localStorage.setItem(storage_key, JSON.stringify(records));
+		} catch (error) {
+			show_message('這個瀏覽器不能儲存資料，重新整理後名單會消失，請記得下載 CSV。');
+		}
+	}
+
+	function show_message(text) {
+		message.textContent = text;
+	}
+
+	// ===== 加入分數 =====
+
+	document.getElementById('entry-form').addEventListener('submit', function (event) {
+		// 表單送出時瀏覽器預設會重新整理頁面，要先擋下來
+		event.preventDefault();
+
+		const name = name_input.value.trim();
+		// 去掉空白和逗號，助教打成 1,230 也能接受
+		const score_text = score_input.value.replace(/[\s,，]/g, '');
+
+		if (name === '') {
+			show_message('請輸入名字。');
+			name_input.focus();
+			return;
+		}
+		if (!/^\d+$/.test(score_text)) {
+			show_message('分數要是 0 或正整數。');
+			score_input.focus();
+			return;
+		}
+		const score = parseInt(score_text, 10);
+
+		// 同一個人玩好幾次時只留最高分，名單才不會被同一個人洗版
+		const old_record = find_record(name);
+		if (old_record === null) {
+			records.push({ name: name, score: score });
+			show_message('已加入：' + name + '　' + score + ' 分');
+		} else if (score > old_record.score) {
+			show_message(name + ' 刷新紀錄：' + old_record.score + ' → ' + score + ' 分');
+			old_record.score = score;
+		} else {
+			show_message(name + ' 已經有 ' + old_record.score + ' 分，這次沒有比較高，保留原本的分數。');
+		}
+
+		just_added_name = name;
+		save_records();
+		draw();
+
+		// 清空輸入框，游標回到名字，助教可以馬上輸入下一位
+		name_input.value = '';
+		score_input.value = '';
+		name_input.focus();
+	});
+
+	function find_record(name) {
+		for (const record of records) {
+			if (record.name === name) {
+				return record;
+			}
+		}
+		return null;
+	}
+
+	function delete_record(name) {
+		records = records.filter(function (record) {
+			return record.name !== name;
+		});
+		save_records();
+		show_message('已刪除：' + name);
+		draw();
+	}
+
+	// ===== 畫出名單 =====
+
+	// 由高到低排序，並算出名次。同分的人名次相同，下一個人跳號，例如 1、2、2、4
+	function get_ranked_records() {
+		const sorted = records.slice().sort(function (a, b) {
+			return b.score - a.score;
+		});
+		const ranked = [];
+		for (let i = 0; i < sorted.length; i = i + 1) {
+			let rank = i + 1;
+			if (i > 0 && sorted[i].score === sorted[i - 1].score) {
+				rank = ranked[i - 1].rank;
+			}
+			ranked.push({ name: sorted[i].name, score: sorted[i].score, rank: rank });
+		}
+		return ranked;
+	}
+
+	function draw() {
+		const podium = document.getElementById('podium');
+		const list = document.getElementById('list');
+		podium.innerHTML = '';
+		list.innerHTML = '';
+
+		const ranked = get_ranked_records();
+		if (ranked.length === 0) {
+			list.innerHTML = '<li class="empty">還沒有人登記分數</li>';
+			return;
+		}
+
+		for (const record of ranked) {
+			// 名次是 1 到 3 的放進前三名區，其他的放進下面的清單
+			if (record.rank <= 3) {
+				podium.appendChild(make_podium_card(record));
+			} else {
+				list.appendChild(make_list_row(record));
+			}
+		}
+	}
+
+	// 名字一律用 textContent 放進去，學生名字裡有 < > 這些符號也不會被當成網頁語法
+	function make_podium_card(record) {
+		const card = make_element('div', 'podium-card rank-' + record.rank, '');
+		card.appendChild(make_element('div', 'podium-rank', '第 ' + record.rank + ' 名'));
+		card.appendChild(make_element('div', 'podium-name', record.name));
+		card.appendChild(make_element('div', 'podium-score', record.score + ' 分'));
+		card.appendChild(make_delete_button(record.name));
+		if (record.name === just_added_name) {
+			card.classList.add('just-added');
+		}
+		return card;
+	}
+
+	function make_list_row(record) {
+		const row = make_element('li', '', '');
+		row.appendChild(make_element('span', 'rank', record.rank));
+		row.appendChild(make_element('span', 'name', record.name));
+		row.appendChild(make_element('span', 'score', record.score + ' 分'));
+		row.appendChild(make_delete_button(record.name));
+		if (record.name === just_added_name) {
+			row.classList.add('just-added');
+		}
+		return row;
+	}
+
+	function make_delete_button(name) {
+		const button = make_element('button', 'delete', '刪除');
+		button.title = '刪除 ' + name;
+		button.addEventListener('click', function () {
+			delete_record(name);
+		});
+		return button;
+	}
+
+	function make_element(tag, class_name, text) {
+		const element = document.createElement(tag);
+		if (class_name !== '') {
+			element.className = class_name;
+		}
+		element.textContent = text;
+		return element;
+	}
+
+	// ===== 下載與清除 =====
+
+	// 下載成 CSV，可以用 Excel 打開。開頭的 ﻿ 讓 Excel 知道這是 UTF-8，中文才不會變亂碼
+	document.getElementById('download-button').addEventListener('click', function () {
+		let text = '﻿名次,名字,分數\n';
+		for (const record of get_ranked_records()) {
+			// 名字用雙引號包起來，名字裡有逗號時才不會被切成兩欄；名字裡的雙引號要寫兩次
+			text = text + record.rank + ',"' + record.name.replace(/"/g, '""') + '",' + record.score + '\n';
+		}
+		const file = new Blob([text], { type: 'text/csv' });
+		const link = document.createElement('a');
+		link.href = URL.createObjectURL(file);
+		link.download = '足球小恐龍排行榜.csv';
+		link.click();
+		// 等瀏覽器開始下載之後再釋放檔案；馬上釋放的話，有些瀏覽器會下載失敗
+		setTimeout(function () {
+			URL.revokeObjectURL(link.href);
+		}, 1000);
+	});
+
+	document.getElementById('clear-button').addEventListener('click', function () {
+		if (records.length === 0) {
+			return;
+		}
+		// 清除之後救不回來，所以要再確認一次
+		if (confirm('確定要清除全部 ' + records.length + ' 筆紀錄嗎？清除後無法復原。')) {
+			records = [];
+			save_records();
+			show_message('已清除全部紀錄。');
+			draw();
+		}
+	});
+
+	draw();
+	name_input.focus();
+</script>
+</body>
+</html>
