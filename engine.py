@@ -127,8 +127,9 @@ def run(student_globals):
 		print_problems('【遊戲沒有開始】請先修正下面的問題：', problems)
 		return
 
-	# 名字很像但不完全一樣的函式只提醒，遊戲照常開始
-	warnings = checks.find_misspelled_functions(student_globals)
+	# 還有空格沒填的函式、名字很像但不完全一樣的函式，都只提醒，遊戲照常開始
+	warnings = checks.find_blank_functions(student_globals)
+	warnings = warnings + checks.find_misspelled_functions(student_globals)
 	if len(warnings) > 0:
 		print_problems('【提醒】遊戲照常開始，但請檢查：', warnings)
 
@@ -241,10 +242,13 @@ def read_student_settings(student_globals):
 	# 複製一份清單，遊戲過程中不會改到學生原本的 course
 	settings['course'] = list(student_globals.get('course', config.default_course))
 
-	settings['on_jump_key'] = student_globals.get('on_jump_key')
-	settings['on_hit'] = student_globals.get('on_hit')
-	settings['on_tick'] = student_globals.get('on_tick')
-	settings['on_shoot_key'] = student_globals.get('on_shoot_key')
+	for function_name in checks.function_descriptions:
+		student_function = student_globals.get(function_name)
+		# 還有 ______ 沒填的函式當作還沒寫。
+		# 否則一呼叫就會出錯、遊戲停下來，學生就沒辦法先試玩壞掉的版本，找出哪裡怪怪的
+		if student_function is not None and checks.has_blank(student_function):
+			student_function = None
+		settings[function_name] = student_function
 	return settings
 
 

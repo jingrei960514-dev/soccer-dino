@@ -164,6 +164,40 @@ def check_functions(student_globals):
 	return problems
 
 
+# ===== 挖空的空格 =====
+# game.ipynb 的規則函式裡，要填的地方寫成 ______。
+# ______ 是合法的變數名稱，所以格子執行時不會出錯；要等函式真的被呼叫，才會出現「找不到這個名字」。
+# 為了讓沒填完的遊戲還是能玩，引擎把還有空格的函式當作「還沒寫」，不呼叫它。
+
+# 全部是底線、而且至少三個的名字就是空格。
+# 學生可能多刪或少刪一個底線，所以不限定剛好六個；一兩個底線的 _ 和 __ 是 Jupyter 自己用的變數，不算。
+def is_blank(name):
+	return len(name) >= 3 and name.strip('_') == ''
+
+
+# 檢查函式裡還有沒有空格。
+# __code__.co_names 是函式裡用到的所有名稱，包括變數名稱（______）和點後面的屬性名稱（game.______），
+# 所以不用讀原始碼，就能知道學生有沒有把空格填完。
+def has_blank(student_function):
+	if not hasattr(student_function, '__code__'):
+		return False
+	for name in student_function.__code__.co_names:
+		if is_blank(name):
+			return True
+	return False
+
+
+# 找出還有空格沒填的規則函式，回傳提醒的清單。
+def find_blank_functions(student_globals):
+	warnings = []
+	for function_name in function_descriptions:
+		if function_name not in student_globals:
+			continue
+		if has_blank(student_globals[function_name]):
+			warnings.append(function_name + '（' + function_descriptions[function_name] + '）還有 ______ 沒填，遊戲會當作它還沒寫好。')
+	return warnings
+
+
 # 找出名字很像、但不完全一樣的函式，例如 on_jump 或 on_jumpkey。
 # 名字打錯時引擎不會呼叫它，遊戲看起來像「沒寫一樣」，學生很難自己發現。
 # 這裡只提醒、不擋下遊戲：Jupyter 會記住改名之前的舊函式，擋下來的話，學生改好之後還是開不了遊戲。
@@ -224,6 +258,10 @@ def guess_reason(student_function, error):
 	message = str(error)
 	name = get_last_quoted(message)
 
+	# 規則函式裡的空格在開始前就會被擋掉，會走到這裡的，是學生自己寫的其他函式裡還有空格
+	if (isinstance(error, NameError) or isinstance(error, AttributeError)) and is_blank(name):
+		return '還有空格 ' + name + ' 沒填，把整個 ' + name + ' 換成正確的程式。'
+
 	if isinstance(error, UnboundLocalError):
 		return '在函式裡改了 ' + name + '，Python 就把它當成函式自己的新變數，但它還沒有值。想讓數值一直累積，請改 game 的屬性，例如 game.speed。'
 
@@ -247,7 +285,9 @@ def guess_reason(student_function, error):
 			reason = 'game 沒有 ' + name + ' 這個屬性。'
 			matches = difflib.get_close_matches(name, student_attribute_names, 1, 0.75)
 			if len(matches) > 0:
-				reason = reason + '是不是要寫 game.' + matches[0] + '？'
+				# 用 display 清單裡的寫法，over 和 shoot 才會帶著括號，提醒學生要呼叫
+				index = student_attribute_names.index(matches[0])
+				reason = reason + '是不是要寫 ' + student_attribute_display[index] + '？'
 			return reason + '可以用的有：' + '、'.join(student_attribute_display)
 		return '點後面的名字 ' + name + ' 不存在，檢查有沒有打錯字。'
 
