@@ -60,9 +60,35 @@ def load_images():
 		except pygame.error:
 			print('assets 裡的 ' + file_name + ' 讀不出來，改用幾何圖形。請確認它是 png 或 jpg 圖檔。')
 			continue
-		# 縮放成固定大小，不管原圖多大，碰撞判定都和畫面上看到的一樣
-		images[name] = pygame.transform.smoothscale(image, config.image_sizes[name])
+		if name == 'background':
+			images[name] = make_scenery(image)
+		else:
+			# 縮放成固定大小，不管原圖多大，碰撞判定都和畫面上看到的一樣
+			images[name] = pygame.transform.smoothscale(image, config.image_sizes[name])
 	return images
+
+
+# 把背景照片做成草地上方的遠景：等比例縮放到剛好蓋滿這塊區域，多出來的部分切掉，再整張調暗。
+# 不直接拉成固定大小，因為照片的比例通常和這塊又寬又扁的區域差很多，硬拉會變形。
+# 調暗只在載入時做一次，每一幀直接貼上，不會拖慢遊戲。
+def make_scenery(image):
+	width, height = config.image_sizes['background']
+	# 取「寬要放大幾倍」和「高要放大幾倍」比較大的那個，兩邊才都蓋得滿
+	scale = max(width / image.get_width(), height / image.get_height())
+	scaled_width = math.ceil(image.get_width() * scale)
+	scaled_height = math.ceil(image.get_height() * scale)
+	scaled = pygame.transform.smoothscale(image, (scaled_width, scaled_height))
+
+	scenery = pygame.Surface((width, height))
+	# 先塗天空色：照片有透明的地方，就會透出天空，而不是黑色
+	scenery.fill(config.sky_color)
+	# 左右置中、對齊底部：照片的下緣通常是地面或樹木，接在草地上面比較自然，切掉的是天空
+	scenery.blit(scaled, ((width - scaled_width) // 2, height - scaled_height))
+
+	dim = pygame.Surface((width, height), pygame.SRCALPHA)
+	dim.fill((0, 0, 0, config.background_dim))
+	scenery.blit(dim, (0, 0))
+	return scenery.convert()
 
 
 # 把圖片畫在「左下角是 (left, bottom)」的位置。
@@ -93,22 +119,22 @@ def draw_frame(screen, fonts, images, game, settings):
 
 # ===== 背景 =====
 
-# 背景：有 background.png 就直接貼上，沒有就畫天空、看台、草地。
-# 不管哪一種，腳下的小草都會跟著捲動，讓玩家感覺到速度。
+# 背景：草地上方有 background.png 就貼照片，沒有就畫天空和看台。
+# 草地和邊線一定用程式畫，換了什麼照片，球員都會踩在草地上。
+# 腳下的小草會跟著捲動，讓玩家感覺到速度。
 def draw_background(screen, images, camera_x):
 	if 'background' in images:
-		# 先塗滿天空色再貼圖：背景圖如果有透明的地方，沒塗的話上一幀的畫面會留下來，變成殘影
-		screen.fill(config.sky_color)
 		screen.blit(images['background'], (0, 0))
 	else:
-		draw_stadium(screen, camera_x)
+		draw_stadium(screen)
+	draw_field(screen, camera_x)
 	draw_grass_tufts(screen, camera_x)
 
 
-# 用幾何圖形畫出天空、看台、草地和邊線。
-def draw_stadium(screen, camera_x):
+# 用幾何圖形畫出草地上方的天空和看台。
+def draw_stadium(screen):
 	# 天空
-	screen.fill(config.sky_color)
+	pygame.draw.rect(screen, config.sky_color, (0, 0, config.screen_width, config.sky_bottom))
 
 	# 看台
 	stands_height = config.stands_bottom - config.sky_bottom
@@ -128,6 +154,9 @@ def draw_stadium(screen, camera_x):
 			color = config.crowd_colors[color_index % len(config.crowd_colors)]
 			pygame.draw.circle(screen, color, (x, y), 7)
 
+
+# 用幾何圖形畫出草地、條紋和邊線。
+def draw_field(screen, camera_x):
 	# 草地底色
 	grass_height = config.screen_height - config.stands_bottom
 	pygame.draw.rect(screen, config.grass_light, (0, config.stands_bottom, config.screen_width, grass_height))

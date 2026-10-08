@@ -127,18 +127,19 @@ official_speed_step = 0.15
 official_max_speed = 16
 # 跑到第幾格時難度達到最高
 official_full_difficulty_slots = 60
-# 一開始每一格有 50% 是空白，最難時降到 15%
+# 一開始每一格有 50% 是空白，最難時降到 5%
 official_gap_chance_start = 0.5
-official_gap_chance_end = 0.15
+official_gap_chance_end = 0.05
 # 不是空白時，各種元素出現的比例；加起來要等於 1
-official_item_weights = [['cone', 0.35], ['defender', 0.25], ['shoe', 0.2], ['ball', 0.2]]
+official_item_weights = [['cone', 0.4], ['defender', 0.28], ['shoe', 0.2], ['ball', 0.12]]
 # 跳過障礙物之後，至少要隔幾格才可以出現球鞋，否則球員還在空中就會被打到
 official_shoe_safe_slots = 2
 # 速度變快之後，跳一次在空中會跑得比較遠；格子如果不跟著變寬，連續兩個障礙物就會躲不掉。
-# 所以每多一格，格子就加寬一點，加到第 official_slot_growth_until 格為止（340 + 100 x 5 = 840）。
+# 所以每多一格，格子就加寬一點，加到第 official_slot_growth_until 格為止（340 + 76 x 5 = 720）。
+# 720 大約是速度到上限時「跳一次加上反應時間」需要的距離；再寬，後面的障礙物反而會變稀疏，難度不升反降。
 # 用「第幾格」而不是「目前速度」來算，保證每個人的關卡位置完全一樣
 official_slot_growth = 5
-official_slot_growth_until = 100
+official_slot_growth_until = 76
 
 # ===== 學生沒寫時的預設值 =====
 default_player_name = '球員'
@@ -169,7 +170,7 @@ shadow_min_scale = 0.4
 # ===== 圖片 =====
 # 圖檔放在專案裡的 assets 資料夾。每個角色對應一個檔名，找不到檔案就用幾何圖形畫，所以一張都不放也能玩。
 # 圖片會自動縮放成下面的大小；寬高最好照這個比例畫，才不會被拉扁。
-# 背景圖不會捲動：整片背景一起滑動很容易頭暈
+# 背景圖只當作草地上方的遠景，不會捲動：整片背景一起滑動很容易頭暈
 assets_folder = 'assets'
 # assets 資料夾的完整路徑，由上面的名稱算出來。
 # 以這個檔案所在的資料夾為準，而不是「目前的資料夾」，從別的地方執行 notebook 也找得到
@@ -194,8 +195,13 @@ image_sizes = {
 	'shoe': (flying_shoe_size, flying_shoe_size),
 	'shot': (shot_radius * 2, shot_radius * 2),
 	'goal': (80, 150),
-	'background': (screen_width, screen_height),
+	# 背景照片只畫在草地上方（看台的位置），草地和邊線仍然用程式畫，球員才會一直踩在草地上。
+	# 照片會等比例縮放到蓋滿這塊區域，多出來的部分切掉，不會被拉扁
+	'background': (screen_width, stands_bottom),
 }
+# 背景照片蓋上一層半透明的黑色：0 是不變暗，255 是全黑。
+# 照片通常又亮又花，暗一點，球員、障礙物和上方的分數才看得清楚
+background_dim = 80
 
 # ===== 音效 =====
 # 音效檔也放在 assets 資料夾。想用 .ogg 檔的話，把下面的檔名改成 .ogg 就好。

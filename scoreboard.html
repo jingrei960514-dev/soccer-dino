@@ -322,14 +322,15 @@
 	// 存在瀏覽器裡用的名稱；同一台電腦打開這個檔案都會讀到同一份資料
 	const storage_key = 'soccer_dino_scoreboard';
 
+	// 這三個要放在最前面：下面的 load_records() 讀不到儲存空間時會呼叫 show_message()，那時 message 必須已經存在
+	const name_input = document.getElementById('name-input');
+	const score_input = document.getElementById('score-input');
+	const message = document.getElementById('message');
+
 	// 所有紀錄，每一筆是 { name: 名字, score: 分數 }
 	let records = load_records();
 	// 剛加入的名字，畫面更新時讓那一列閃一下
 	let just_added_name = '';
-
-	const name_input = document.getElementById('name-input');
-	const score_input = document.getElementById('score-input');
-	const message = document.getElementById('message');
 
 	// ===== 讀寫瀏覽器的儲存空間 =====
 
