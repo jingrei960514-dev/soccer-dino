@@ -82,7 +82,7 @@ class Game:
 		# 下一格要放在世界中的哪個位置，以及它是第幾格
 		self.next_slot_x = config.first_item_x
 		self.slot_index = 0
-		# 距離上一個「要跳的障礙物」已經隔了幾格；用來避免高空球緊跟在跳躍之後
+		# 距離上一個「要跳的障礙物」已經隔了幾格；用來避免球鞋緊跟在跳躍之後
 		self.slots_since_jump_obstacle = 99
 
 		# 記下 game 原本有哪些屬性。學生把名稱打錯（例如 game.live）時，Python 會多出一個新屬性，
@@ -399,8 +399,8 @@ def pick_official_item(game):
 				name = pair[0]
 				break
 
-	# 公平性：剛跳過障礙物時球員還在空中，緊接著的高空球一定躲不掉，所以改成空白
-	if name == 'high_ball' and game.slots_since_jump_obstacle < config.official_high_ball_safe_slots:
+	# 公平性：剛跳過障礙物時球員還在空中，緊接著的球鞋一定躲不掉，所以改成空白
+	if name == 'shoe' and game.slots_since_jump_obstacle < config.official_shoe_safe_slots:
 		name = 'gap'
 
 	if name == 'cone' or name == 'defender':
@@ -524,7 +524,7 @@ def update_player(game):
 		game.vy = 0
 
 
-# 防守球員和高空球會主動往球員衝過來，所以除了跟著畫面捲動，還要再多往左移。
+# 防守球員和球鞋會主動往球員衝過來，所以除了跟著畫面捲動，還要再多往左移。
 # 同時把已經遠遠落在畫面左邊外的東西刪掉，官方模式的清單才不會無限變長。
 def move_things(game):
 	remaining_things = []
@@ -538,8 +538,8 @@ def move_things(game):
 			# 只有進入畫面後才開始移動，否則還沒出現就跑到別的障礙物身上去了
 			if thing['kind'] == 'defender':
 				thing['x'] = thing['x'] - config.defender_extra_speed
-			elif thing['kind'] == 'high_ball':
-				thing['x'] = thing['x'] - config.high_ball_extra_speed
+			elif thing['kind'] == 'shoe':
+				thing['x'] = thing['x'] - config.flying_shoe_extra_speed
 
 		# 已經掉到畫面左邊外、或飛出畫面上方的就刪掉
 		if screen_x > -config.remove_behind_distance and thing['lift'] < config.screen_height:
@@ -548,7 +548,7 @@ def move_things(game):
 
 
 # 射出去的球每一幀往前飛，碰到還沒被踢飛的防守球員就把他踢飛，球也跟著消失。
-# 球只對防守球員有效，碰到三角錐、地上的球、高空球都直接穿過去，規則比較單純。
+# 球只對防守球員有效，碰到三角錐、地上的球、球鞋都直接穿過去，規則比較單純。
 def move_shots(game):
 	remaining_shots = []
 	for shot in game.shots:
@@ -629,10 +629,10 @@ def get_thing_rect(thing, camera_x):
 		width = config.ball_radius * 2
 		height = width
 		top = config.ground_y - height
-	elif kind == 'high_ball':
-		width = config.high_ball_radius * 2
+	elif kind == 'shoe':
+		width = config.flying_shoe_size
 		height = width
-		top = config.high_ball_center_y - config.high_ball_radius
+		top = config.flying_shoe_bottom - height
 	else:
 		return None
 

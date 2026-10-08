@@ -2,6 +2,7 @@
 # 修改教材時只改 solution.ipynb，再執行 python make_game_notebook.py，兩份就不會不一致。
 # 做法：在 solution.ipynb 裡找出含有特定文字的格子，把整格換成下面寫好的破壞版內容，
 # 其他格子（說明、球員設定、開始遊戲）原封不動。
+# 教師版裡有答案的格子都要列在 replacements 裡，否則答案會原封不動帶到破壞版。
 
 import json
 
@@ -79,6 +80,13 @@ def on_tick(game):
 	game.speed = ______
 '''
 
+# 挑戰題不挖空，直接換成空的格子，教師版裡的答案才不會跟著帶到破壞版。
+# 挑戰一（二段跳）改的是 on_jump_key，已經被上面的 jump_cell 換掉了，不用另外處理
+shoot_cell = '''
+# ===== 挑戰二：射門 =====
+# 在這裡寫 on_shoot_key(game)，寫好之後重新執行這一格
+'''
+
 # 每一組是一個清單：第一個是要找的文字，第二個是換成的內容。
 # 要找的文字必須只出現在那一格裡，否則會換錯格子。
 replacements = [
@@ -87,6 +95,7 @@ replacements = [
 	['def on_jump_key', jump_cell],
 	['def on_hit', hit_cell],
 	['def on_tick', tick_cell],
+	['# ===== 挑戰二：射門 =====', shoot_cell],
 ]
 
 

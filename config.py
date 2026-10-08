@@ -40,6 +40,8 @@ crowd_rows = 4
 player_x = 160
 player_width = 40
 player_height = 80
+# 跑步動畫有兩格動作，每一格維持幾幀；數字愈小，腳換得愈快
+run_frame_length = 8
 
 # ===== 物理 =====
 # 每一幀往下增加的速度；數字愈大，跳起來落得愈快
@@ -68,7 +70,7 @@ slot_width = 340
 # 最後一個元素之後還要跑多遠才到球門
 goal_distance_after_course = 300
 # course 清單裡可以用的名稱
-course_item_names = ['cone', 'defender', 'high_ball', 'ball', 'gap']
+course_item_names = ['cone', 'defender', 'shoe', 'ball', 'gap']
 # course 最多幾個元素；學生的迴圈寫錯時可能產生幾百萬個，遊戲會卡住，所以開始前先擋下來
 max_course_length = 1000
 # 名字和背號太長會超出畫面或球衣
@@ -83,14 +85,15 @@ cone_height = 44
 defender_width = 72
 defender_height = 34
 ball_radius = 12
-high_ball_radius = 13
-# 高空球的底部和站著的球員頭頂之間的空隙；站著剛好不會碰到，一跳就會撞到
-high_ball_gap = 6
-# 高空球中心的高度，由上面的數值算出來，改上面的數字就好
-high_ball_center_y = ground_y - player_height - high_ball_gap - high_ball_radius
-# 防守球員鏟過來、高空球飛過來時，比畫面捲動再快多少
+# 飛過來的球鞋會一直翻轉，所以碰撞框是正方形，鞋子轉到哪個角度都不會超出框外
+flying_shoe_size = 30
+# 球鞋的底部和站著的球員頭頂之間的空隙；站著剛好不會碰到，一跳就會撞到
+flying_shoe_gap = 6
+# 球鞋底部的高度，由上面的數值算出來，改上面的數字就好
+flying_shoe_bottom = ground_y - player_height - flying_shoe_gap
+# 防守球員鏟過來、球鞋飛過來時，比畫面捲動再快多少
 defender_extra_speed = 1.5
-high_ball_extra_speed = 3
+flying_shoe_extra_speed = 3
 # 碰撞框往內縮的距離；縮一點會比較寬鬆，畫面上看起來擦到邊不會算撞到
 hitbox_margin = 5
 # 已經離開畫面左邊多遠的東西可以刪掉，免得清單愈來愈長
@@ -128,9 +131,9 @@ official_full_difficulty_slots = 60
 official_gap_chance_start = 0.5
 official_gap_chance_end = 0.15
 # 不是空白時，各種元素出現的比例；加起來要等於 1
-official_item_weights = [['cone', 0.35], ['defender', 0.25], ['high_ball', 0.2], ['ball', 0.2]]
-# 跳過障礙物之後，至少要隔幾格才可以出現高空球，否則球員還在空中就會被打到
-official_high_ball_safe_slots = 2
+official_item_weights = [['cone', 0.35], ['defender', 0.25], ['shoe', 0.2], ['ball', 0.2]]
+# 跳過障礙物之後，至少要隔幾格才可以出現球鞋，否則球員還在空中就會被打到
+official_shoe_safe_slots = 2
 # 速度變快之後，跳一次在空中會跑得比較遠；格子如果不跟著變寬，連續兩個障礙物就會躲不掉。
 # 所以每多一格，格子就加寬一點，加到第 official_slot_growth_until 格為止（340 + 100 x 5 = 840）。
 # 用「第幾格」而不是「目前速度」來算，保證每個人的關卡位置完全一樣
@@ -150,6 +153,19 @@ shoot_keys = [pygame.K_f, pygame.K_x]
 restart_keys = [pygame.K_r, pygame.K_RETURN]
 quit_key = pygame.K_ESCAPE
 
+# ===== 陰影 =====
+# 球員、障礙物、足球腳下的橢圓形陰影。陰影永遠貼在地面上，東西離地愈高，陰影愈小，
+# 玩家看陰影就知道自己跳多高、球鞋在哪裡
+shadow_color = (0, 0, 0)
+# 陰影的透明度，0 是完全看不到，255 是全黑
+shadow_alpha = 90
+# 陰影的高度是寬度的幾分之一；數字愈小，陰影愈扁
+shadow_flatness = 4
+# 離地多高時陰影縮到最小
+shadow_fade_height = 250
+# 陰影最小縮到原本的多少；飛得再高也留一點，才看得出東西在哪裡
+shadow_min_scale = 0.4
+
 # ===== 圖片 =====
 # 圖檔放在專案裡的 assets 資料夾。每個角色對應一個檔名，找不到檔案就用幾何圖形畫，所以一張都不放也能玩。
 # 圖片會自動縮放成下面的大小；寬高最好照這個比例畫，才不會被拉扁。
@@ -163,7 +179,7 @@ image_files = {
 	'cone': 'cone.png',
 	'defender': 'defender.png',
 	'ball': 'ball.png',
-	'high_ball': 'high_ball.png',
+	'shoe': 'shoe.png',
 	'shot': 'shot.png',
 	'goal': 'goal.png',
 	'background': 'background.png',
@@ -175,7 +191,7 @@ image_sizes = {
 	'cone': (cone_width, cone_height),
 	'defender': (defender_width, defender_height),
 	'ball': (ball_radius * 2, ball_radius * 2),
-	'high_ball': (high_ball_radius * 2, high_ball_radius * 2),
+	'shoe': (flying_shoe_size, flying_shoe_size),
 	'shot': (shot_radius * 2, shot_radius * 2),
 	'goal': (80, 150),
 	'background': (screen_width, screen_height),
@@ -240,8 +256,15 @@ grass_dark = (68, 155, 68)
 line_color = (240, 240, 240)
 grass_tuft_color = (45, 120, 45)
 skin_color = (240, 200, 160)
+# 側面看時，離鏡頭較遠的手腳畫暗一點，兩隻腳交換時才分得出前後
+far_skin_color = (205, 165, 130)
+hair_color = (60, 40, 30)
 shorts_color = (30, 30, 30)
 shoe_color = (20, 20, 20)
+# 飛過來的球鞋：桃紅色，和球員的黑鞋、橘色三角錐、球衣的顏色都分得開
+flying_shoe_color = (235, 70, 150)
+flying_shoe_outline_color = (120, 25, 75)
+flying_shoe_sole_color = (40, 40, 40)
 cone_color = (255, 130, 0)
 cone_base_color = (200, 90, 0)
 defender_jersey_color = (100, 100, 120)

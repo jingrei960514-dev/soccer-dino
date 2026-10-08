@@ -109,7 +109,7 @@ notebook 的程式格也會套用這個設定。
 | --- | --- | --- |
 | `'cone'` | 三角錐 | 跳過去 |
 | `'defender'` | 鏟球的防守球員，會往球員衝過來 | 跳過去，或射門把他踢飛 |
-| `'high_ball'` | 從頭頂高度飛過來的高空球 | 站著不要跳 |
+| `'shoe'` | 從頭頂高度飛過來的球鞋 | 站著不要跳 |
 | `'ball'` | 地上的足球 | 碰到就撿起來，加 50 分和一發彈藥 |
 | `'gap'` | 空白 | 什麼都沒有，用來調整間隔 |
 
@@ -120,7 +120,7 @@ notebook 的程式格也會套用這個設定。
 | 函式 | 什麼時候執行 |
 | --- | --- |
 | `on_jump_key(game)` | 按下空白鍵、上方向鍵或 W |
-| `on_hit(game)` | 撞到三角錐、防守球員或高空球（撞到之後有 1.5 秒無敵） |
+| `on_hit(game)` | 撞到三角錐、防守球員或球鞋（撞到之後有 1.5 秒無敵） |
 | `on_tick(game)` | 每過一秒 |
 | `on_shoot_key(game)` | 按下 F 或 X（挑戰題） |
 
@@ -159,7 +159,7 @@ notebook 的程式格也會套用這個設定。
 把 `course` 裡的一些 `'cone'` 換成其他名稱，例如：
 
 ```python
-course = ['cone', 'gap', 'defender', 'ball', 'high_ball']
+course = ['cone', 'gap', 'defender', 'ball', 'shoe']
 for i in range(3):
 	course.append('cone')
 	course.append('gap')

@@ -160,6 +160,43 @@ def draw_grass_tufts(screen, camera_x):
 		x = x + config.grass_tuft_spacing
 
 
+# ===== 陰影 =====
+
+# 在地面上畫一個半透明的橢圓形陰影。center_x 是陰影中間的 x，width 是東西貼地時陰影的寬度，
+# height_above_ground 是東西的底部離地多高。陰影永遠畫在地面上，東西愈高陰影愈小。
+# 要在東西本身之前畫，陰影才會被東西蓋住。
+def draw_shadow(screen, center_x, width, height_above_ground):
+	scale = 1 - height_above_ground / config.shadow_fade_height
+	scale = max(config.shadow_min_scale, min(1, scale))
+	shadow_width = max(2, int(width * scale))
+	shadow_height = max(2, shadow_width // config.shadow_flatness)
+
+	# pygame.draw.ellipse 直接畫在畫面上不能半透明，
+	# 所以先畫在一張支援透明的小圖上（SRCALPHA），再貼到畫面
+	shadow_image = pygame.Surface((shadow_width, shadow_height), pygame.SRCALPHA)
+	color = (config.shadow_color[0], config.shadow_color[1], config.shadow_color[2], config.shadow_alpha)
+	pygame.draw.ellipse(shadow_image, color, (0, 0, shadow_width, shadow_height))
+	rect = shadow_image.get_rect()
+	rect.center = (int(center_x), config.ground_y)
+	screen.blit(shadow_image, rect)
+
+
+# 關卡元素的陰影，依種類決定寬度和離地高度。
+def draw_thing_shadow(screen, thing, screen_x):
+	kind = thing['kind']
+	if kind == 'cone':
+		draw_shadow(screen, screen_x + config.cone_width // 2, config.cone_width + 10, 0)
+	elif kind == 'defender':
+		# 被踢飛時 lift 愈來愈大，陰影就跟著縮小
+		draw_shadow(screen, screen_x + config.defender_width // 2, config.defender_width, thing['lift'])
+	elif kind == 'ball':
+		radius = config.ball_radius
+		draw_shadow(screen, screen_x + radius, radius * 2 + 4, 0)
+	elif kind == 'shoe':
+		size = config.flying_shoe_size
+		draw_shadow(screen, screen_x + size // 2, size, config.ground_y - config.flying_shoe_bottom)
+
+
 # ===== 足球 =====
 
 # 畫一顆足球：白色圓形加上黑色花紋。angle 會隨時間改變，看起來像在滾動。
@@ -180,22 +217,60 @@ def draw_soccer_ball(screen, center_x, center_y, radius, angle):
 
 # ===== 球員 =====
 
-def draw_player(screen, fonts, images, game, settings):
-	# 無敵時閃爍：每 6 幀換一次「畫」或「不畫」
-	if game.invincible_timer > 0 and (game.invincible_timer // 6) % 2 == 0:
-		return
+# 側面球員的三種姿勢：跑步的第 0 格、第 1 格，以及在空中的 'jump'。
+# 每隻手腳是一串關節的位置 [肩膀或臀部, 手肘或膝蓋, 手或腳踝]，
+# 數字是相對於「腳底中間」(x, feet_y) 往右、往下各差幾像素，所以負的 y 代表往上。
+# near 是靠近鏡頭的手腳，far 是另一邊被身體擋住一半的手腳。
+# 兩格跑步動作：第 0 格兩腳大步張開，第 1 格兩腳收在身體下面、近的膝蓋往前抬。
+# 如果兩格只是把前後腳交換，側面看起來外形一模一樣，就看不出在跑，所以兩格的外形要不同。
+# 手和同一邊的腳反方向擺
+player_poses = {
+	0: {
+		'near_leg': [(2, -28), (9, -16), (12, -3)],
+		'far_leg': [(-2, -28), (-6, -15), (-14, -7)],
+		'near_arm': [(0, -53), (-6, -44), (-3, -36)],
+		'far_arm': [(0, -53), (7, -46), (13, -42)],
+	},
+	1: {
+		'near_leg': [(1, -28), (10, -20), (3, -11)],
+		'far_leg': [(-1, -28), (2, -15), (1, -3)],
+		'near_arm': [(0, -53), (6, -45), (12, -41)],
+		'far_arm': [(0, -53), (-5, -45), (-2, -37)],
+	},
+	# 跳起來時兩腳收起來，手往前上方伸
+	'jump': {
+		'near_leg': [(2, -28), (11, -21), (6, -8)],
+		'far_leg': [(-2, -28), (3, -17), (-8, -11)],
+		'near_arm': [(0, -53), (8, -58), (14, -65)],
+		'far_arm': [(0, -53), (-7, -47), (-12, -42)],
+	},
+}
 
+
+def draw_player(screen, fonts, images, game, settings):
 	x = config.player_x
 	feet_y = int(game.player_y)
 
-	# 跑步動畫：在地上時兩隻腳前後交換；在空中時固定成跨步的姿勢
+	# 在地上時兩格跑步動作輪流；在空中時固定成跳躍的姿勢
 	if game.on_ground:
-		if (game.frame_count // 6) % 2 == 0:
-			leg_swing = 7
-		else:
-			leg_swing = -7
+		pose = player_poses[(game.frame_count // config.run_frame_length) % 2]
 	else:
-		leg_swing = 9
+		pose = player_poses['jump']
+
+	# 腳前帶著的球：放在比較前面那隻腳的腳尖前方，跟著步伐前後動
+	front_foot_x = max(pose['near_leg'][2][0], pose['far_leg'][2][0])
+	ball_radius = 8
+	ball_x = x + front_foot_x + 10 + ball_radius
+
+	# 陰影留在地面上，跳得愈高愈小。畫在閃爍的判斷之前，無敵閃爍時陰影仍然看得到，
+	# 玩家才不會找不到自己在哪裡
+	height_above_ground = config.ground_y - feet_y
+	draw_shadow(screen, x, config.player_width + 8, height_above_ground)
+	draw_shadow(screen, ball_x, ball_radius * 2 + 2, height_above_ground)
+
+	# 無敵時閃爍：每 6 幀換一次「畫」或「不畫」
+	if game.invincible_timer > 0 and (game.invincible_timer // 6) % 2 == 0:
+		return
 
 	# 有 player.png 就用圖片，圖片的底部中間對準球員的腳。
 	# 注意：用圖片時看不到學生選的球衣顏色和背號，因為那些畫在圖片裡了
@@ -203,49 +278,85 @@ def draw_player(screen, fonts, images, game, settings):
 		image_width = config.image_sizes['player'][0]
 		draw_image(screen, images['player'], x - image_width // 2, feet_y)
 	else:
-		draw_player_body(screen, fonts, settings, x, feet_y, leg_swing)
+		draw_player_body(screen, fonts, settings, x, feet_y, pose)
 
-	# 腳下帶著的球：在地上時跟著步伐前後動一點
-	ball_x = x + 24 + leg_swing // 2
-	draw_soccer_ball(screen, ball_x, feet_y - 8, 8, game.frame_count * 10)
+	draw_soccer_ball(screen, ball_x, feet_y - ball_radius, ball_radius, game.frame_count * 10)
 
 	# 名字顯示在頭上
 	draw_text(screen, fonts['small'], settings['player_name'], config.text_color, x, feet_y - 108, 'center')
 
 
-# 用幾何圖形畫出球員的身體：腳、短褲、球衣、背號、頭。
-# (x, feet_y) 是腳底的中間；leg_swing 是兩隻腳前後分開多少，做出跑步的樣子。
-def draw_player_body(screen, fonts, settings, x, feet_y, leg_swing):
-	# 腳（皮膚）與鞋子
-	pygame.draw.rect(screen, config.skin_color, (x - 4 + leg_swing, feet_y - 26, 8, 26))
-	pygame.draw.rect(screen, config.skin_color, (x - 4 - leg_swing, feet_y - 26, 8, 26))
-	pygame.draw.rect(screen, config.shoe_color, (x - 4 + leg_swing, feet_y - 6, 13, 6))
-	pygame.draw.rect(screen, config.shoe_color, (x - 4 - leg_swing, feet_y - 6, 13, 6))
+# 把 player_poses 裡的相對位置換成螢幕上的座標。
+def get_joints(points, x, feet_y):
+	joints = []
+	for point in points:
+		joints.append((x + point[0], feet_y + point[1]))
+	return joints
 
-	# 短褲
-	pygame.draw.rect(screen, config.shorts_color, (x - 14, feet_y - 36, 28, 14))
 
-	# 球衣與手臂
-	pygame.draw.rect(screen, settings['jersey_rgb'], (x - 16, feet_y - 64, 32, 30))
-	pygame.draw.rect(screen, settings['jersey_rgb'], (x - 22, feet_y - 62, 7, 14))
-	pygame.draw.rect(screen, settings['jersey_rgb'], (x + 15, feet_y - 62, 7, 14))
-	pygame.draw.rect(screen, config.skin_color, (x - 22, feet_y - 48, 7, 10))
-	pygame.draw.rect(screen, config.skin_color, (x + 15, feet_y - 48, 7, 10))
+# 一隻腳：大腿和小腿是粗線，腳踝的位置畫一隻往右的鞋子。
+def draw_leg(screen, points, x, feet_y, skin):
+	joints = get_joints(points, x, feet_y)
+	pygame.draw.line(screen, skin, joints[0], joints[1], 7)
+	pygame.draw.line(screen, skin, joints[1], joints[2], 6)
+	# 膝蓋畫一個圓，大腿和小腿接起來的地方才不會有缺角
+	pygame.draw.circle(screen, skin, joints[1], 3)
+	ankle = joints[2]
+	pygame.draw.rect(screen, config.shoe_color, (ankle[0] - 3, ankle[1] - 3, 12, 6), 0, 2)
 
-	# 背號：淺色球衣用黑字，深色球衣用白字，才看得清楚
-	jersey_rgb = settings['jersey_rgb']
+
+# 一隻手：上臂是球衣的袖子，前臂是皮膚。
+def draw_arm(screen, points, x, feet_y, sleeve, skin):
+	joints = get_joints(points, x, feet_y)
+	pygame.draw.line(screen, sleeve, joints[0], joints[1], 7)
+	pygame.draw.line(screen, skin, joints[1], joints[2], 5)
+	pygame.draw.circle(screen, skin, joints[2], 3)
+
+
+# 背號的顏色：淺色球衣用黑字，深色球衣用白字，才看得清楚。
+def get_number_color(jersey_rgb):
 	if jersey_rgb[0] + jersey_rgb[1] + jersey_rgb[2] > 450:
-		number_color = config.black
-	else:
-		number_color = config.white
-	number_image = fonts['number'].render(settings['jersey_number'], True, number_color)
+		return config.black
+	return config.white
+
+
+# 用幾何圖形畫出面向右方的側面球員：手腳、短褲、球衣、背號、頭。
+# (x, feet_y) 是腳底的中間；pose 是 player_poses 裡的一種姿勢。
+# 由遠到近畫：遠的手腳 → 身體 → 近的手腳 → 頭，後畫的會蓋住先畫的。
+def draw_player_body(screen, fonts, settings, x, feet_y, pose):
+	jersey_rgb = settings['jersey_rgb']
+
+	# 遠的那一邊：顏色暗一點，看起來在身體後面
+	draw_arm(screen, pose['far_arm'], x, feet_y, jersey_rgb, config.far_skin_color)
+	draw_leg(screen, pose['far_leg'], x, feet_y, config.far_skin_color)
+
+	# 短褲和球衣（側面看比正面窄），四個角稍微圓一點
+	pygame.draw.rect(screen, config.shorts_color, (x - 11, feet_y - 35, 22, 11), 0, 3)
+	pygame.draw.rect(screen, jersey_rgb, (x - 12, feet_y - 59, 24, 27), 0, 5)
+
+	# 近的那一邊
+	draw_leg(screen, pose['near_leg'], x, feet_y, config.skin_color)
+	draw_arm(screen, pose['near_arm'], x, feet_y, jersey_rgb, config.skin_color)
+
+	# 背號畫在近的手臂之後：手臂擺過球衣中間時，背號才不會被擋住
+	number_image = fonts['number'].render(settings['jersey_number'], True, get_number_color(jersey_rgb))
+	# 三位數的背號比側面的球衣寬，等比例縮小到放得進球衣
+	max_number_width = 22
+	if number_image.get_width() > max_number_width:
+		new_height = number_image.get_height() * max_number_width // number_image.get_width()
+		number_image = pygame.transform.smoothscale(number_image, (max_number_width, new_height))
 	number_rect = number_image.get_rect()
-	number_rect.center = (x, feet_y - 49)
+	number_rect.center = (x, feet_y - 45)
 	screen.blit(number_image, number_rect)
 
-	# 頭和眼睛（面向右邊）
-	pygame.draw.circle(screen, config.skin_color, (x, feet_y - 72), 11)
-	pygame.draw.circle(screen, config.black, (x + 5, feet_y - 74), 2)
+	# 脖子
+	pygame.draw.rect(screen, config.skin_color, (x - 3, feet_y - 63, 7, 6))
+	# 頭：先畫頭髮的圓，再把臉的圓往右下錯開蓋上去，頭頂和後腦就會留下頭髮
+	pygame.draw.circle(screen, config.hair_color, (x + 1, feet_y - 73), 11)
+	pygame.draw.circle(screen, config.skin_color, (x + 3, feet_y - 69), 10)
+	# 眼睛和鼻子都在右邊，代表面向右方
+	pygame.draw.circle(screen, config.black, (x + 8, feet_y - 71), 2)
+	pygame.draw.polygon(screen, config.skin_color, [(x + 12, feet_y - 70), (x + 16, feet_y - 66), (x + 12, feet_y - 64)])
 
 
 # ===== 關卡元素 =====
@@ -261,6 +372,9 @@ def draw_thing(screen, images, thing, camera_x, frame_count):
 	if kind == 'ball' and thing['done']:
 		return
 
+	# 陰影先畫，才會被東西本身蓋住；用圖片時也一樣要有陰影
+	draw_thing_shadow(screen, thing, screen_x)
+
 	# 有這種角色的圖片就用圖片
 	if kind in images:
 		draw_image(screen, images[kind], screen_x, get_thing_bottom(thing))
@@ -273,15 +387,15 @@ def draw_thing(screen, images, thing, camera_x, frame_count):
 	elif kind == 'ball':
 		radius = config.ball_radius
 		draw_soccer_ball(screen, screen_x + radius, config.ground_y - radius, radius, -frame_count * 6)
-	elif kind == 'high_ball':
-		draw_high_ball(screen, screen_x, frame_count)
+	elif kind == 'shoe':
+		draw_flying_shoe(screen, screen_x, frame_count)
 
 
 # 關卡元素的底部在螢幕上的高度，畫圖片時用。
-# 高空球飄在半空中；其他都站在地上，被踢飛的防守球員再往上加 lift。
+# 球鞋飄在半空中；其他都站在地上，被踢飛的防守球員再往上加 lift。
 def get_thing_bottom(thing):
-	if thing['kind'] == 'high_ball':
-		return config.high_ball_center_y + config.high_ball_radius
+	if thing['kind'] == 'shoe':
+		return config.flying_shoe_bottom
 	return config.ground_y - int(thing['lift'])
 
 
@@ -341,10 +455,11 @@ def draw_defender(screen, left, lift, frame_count):
 
 # 射出去的球：貼著地面往右飛，左邊拖著速度線。
 def draw_shot(screen, images, shot, camera_x, frame_count):
+	radius = config.shot_radius
+	draw_shadow(screen, shot['x'] - camera_x + radius, radius * 2 + 4, 0)
 	if 'shot' in images:
 		draw_image(screen, images['shot'], shot['x'] - camera_x, config.ground_y)
 		return
-	radius = config.shot_radius
 	center_x = int(shot['x'] - camera_x) + radius
 	center_y = config.ground_y - radius
 	for i in range(3):
@@ -354,16 +469,36 @@ def draw_shot(screen, images, shot, camera_x, frame_count):
 	draw_soccer_ball(screen, center_x, center_y, radius, frame_count * 25)
 
 
-# 高空球：在頭頂高度飛過來的足球，後面拖著幾條速度線。
-def draw_high_ball(screen, left, frame_count):
-	radius = config.high_ball_radius
-	center_x = left + radius
-	center_y = config.high_ball_center_y
+# 飛過來的球鞋：在頭頂高度邊翻轉邊飛過來，後面拖著幾條速度線。
+# 先把鞋子畫在一張透明的小畫布上（鞋尖朝左，也就是飛過來的方向），再整張旋轉後貼到畫面上。
+def draw_flying_shoe(screen, left, frame_count):
+	size = config.flying_shoe_size
+	center_x = left + size // 2
+	center_y = config.flying_shoe_bottom - size // 2
+
+	# 速度線不跟著轉，固定拖在右後方
 	for i in range(3):
 		line_y = center_y - 6 + i * 6
-		line_start = center_x + radius + 4
+		line_start = left + size + 4
 		pygame.draw.line(screen, config.white, (line_start, line_y), (line_start + 14 + i * 4, line_y), 2)
-	draw_soccer_ball(screen, center_x, center_y, radius, -frame_count * 12)
+
+	shoe = pygame.Surface((size, size), pygame.SRCALPHA)
+	# 鞋面：左邊是低低圓圓的鞋尖，往右愈來愈高，最右邊是鞋跟和鞋口
+	upper = [(2, 19), (3, 15), (11, 13), (17, 8), (27, 8), (28, 12), (28, 19)]
+	pygame.draw.polygon(shoe, config.flying_shoe_color, upper)
+	pygame.draw.polygon(shoe, config.flying_shoe_outline_color, upper, 1)
+	# 白色線條和鞋帶
+	pygame.draw.line(shoe, config.white, (13, 17), (23, 12), 2)
+	for lace_x, lace_y in [(8, 14), (11, 13), (14, 11)]:
+		pygame.draw.circle(shoe, config.white, (lace_x, lace_y), 1)
+	# 鞋底和鞋釘
+	pygame.draw.rect(shoe, config.flying_shoe_sole_color, (1, 19, 28, 3), 0, 1)
+	for stud_x in [4, 10, 20, 25]:
+		pygame.draw.rect(shoe, config.flying_shoe_sole_color, (stud_x, 22, 3, 2))
+
+	# 往前翻轉；rotate 之後畫布會變大，所以用中心點對齊，鞋子才不會轉著轉著飄走
+	rotated = pygame.transform.rotate(shoe, frame_count * 12 % 360)
+	screen.blit(rotated, rotated.get_rect(center=(center_x, center_y)))
 
 
 # ===== 球門 =====
