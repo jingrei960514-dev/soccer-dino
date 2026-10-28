@@ -24,6 +24,10 @@ function_descriptions = {
 	'on_shoot_key': '按下射門鍵時執行',
 }
 
+# 只有挑戰題才會用到的函式。沒填完時提醒的語氣不一樣：挑戰題是選做的，
+# 不說清楚的話，修好四個問題的同學看到「還沒寫好」，會以為自己還有東西沒修好
+challenge_functions = ['on_shoot_key']
+
 # game 裡學生會改到、而且必須是數字的屬性；不是數字的話，引擎計算時就會出錯
 number_attributes = ['vy', 'lives', 'speed', 'jump_count', 'ammo']
 
@@ -218,7 +222,11 @@ def find_blank_functions(student_globals):
 	for function_name in function_descriptions:
 		if function_name not in student_globals:
 			continue
-		if has_blank(student_globals[function_name]):
+		if not has_blank(student_globals[function_name]):
+			continue
+		if function_name in challenge_functions:
+			warnings.append(function_name + '（挑戰題，選做）還沒完成，先不能射門。不做也可以照常玩。')
+		else:
 			warnings.append(function_name + '（' + function_descriptions[function_name] + '）還有 ______ 沒填，遊戲會當作它還沒寫好。')
 	return warnings
 
