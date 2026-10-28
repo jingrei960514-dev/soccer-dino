@@ -120,11 +120,11 @@ kick_points = 30
 # ===== 官方模式 =====
 # 亂數種子：同一個種子永遠產生同樣的關卡。比賽當天大家都用這個值，分數才能互相比較；
 # 想換一套新關卡時改這個數字，但比賽進行中絕對不要改
-official_seed = 20261005
+official_seed = 20261028
 official_jump_power = 12
 # 每過一秒加多少速度，以及速度加到多少就不再加
 official_speed_step = 0.15
-official_max_speed = 16
+official_max_speed = 20
 # 跑到第幾格時難度達到最高
 official_full_difficulty_slots = 60
 # 一開始每一格有 50% 是空白，最難時降到 5%
@@ -136,10 +136,41 @@ official_item_weights = [['cone', 0.4], ['defender', 0.28], ['shoe', 0.2], ['bal
 official_shoe_safe_slots = 2
 # 速度變快之後，跳一次在空中會跑得比較遠；格子如果不跟著變寬，連續兩個障礙物就會躲不掉。
 # 所以每多一格，格子就加寬一點，加到第 official_slot_growth_until 格為止（340 + 76 x 5 = 720）。
-# 720 大約是速度到上限時「跳一次加上反應時間」需要的距離；再寬，後面的障礙物反而會變稀疏，難度不升反降。
+# 再寬，後面的障礙物反而會變稀疏，難度不升反降；再窄，連續的障礙物會躲不掉（用 teacher/test_official.py 測過）。
 # 用「第幾格」而不是「目前速度」來算，保證每個人的關卡位置完全一樣
 official_slot_growth = 5
 official_slot_growth_until = 76
+# 官方模式的命和被撞之後的無敵時間（學生模式用上面的 start_lives、invincible_frames）
+official_start_lives = 2
+official_invincible_frames = 60
+# 組合障礙：從第幾格開始出現、到第幾格機率最高，以及最高的機率
+official_combo_start_slot = 15
+official_combo_full_slot = 60
+official_combo_max_chance = 0.5
+# 兩個三角錐之間的距離，每一組從這裡隨機挑一個：數字愈大愈難，大約 260 以上就要用二段跳
+official_cone_pair_gaps = [180, 260, 340, 380]
+# 球鞋和後面三角錐的距離
+official_shoe_cone_gap = 150
+# 不能放障礙物的格子（組合的下一格、太靠近障礙物的球鞋），有多少機會改放一顆足球。
+# 球太少的話調高這個數字
+official_bonus_ball_chance = 0.3
+# 官方模式分數到這裡，背景換成 background_school.png（順安國中）。想早一點或晚一點換，改這個數字。
+# assets 裡沒有這張圖的話就不會換，遊戲照常進行
+school_background_score = 2000
+# 換背景時，新舊兩張照片花幾幀慢慢交替（60 幀 = 1 秒）；突然換掉會嚇一跳
+school_fade_frames = 60
+# 換背景時畫面中間顯示的字，以及顯示幾幀
+school_banner_text = '歡迎來到順安國中！'
+school_banner_frames = 150
+
+# ===== 自動登記分數 =====
+# 老師電腦執行 teacher/score_server.py 之後，官方模式每結束一局，就把分數送到計分板。
+# 計分板伺服器使用的連接埠；學生在 official.ipynb 只要填 IP，不用填這個
+score_server_port = 8765
+# 送分數時最多等幾秒。連不到時遊戲結束畫面會卡住這麼久，所以不要設太長
+score_upload_timeout = 2
+# 計分板接受的最高分數。速度上限每秒大約 120 分，這個數字等於連續玩快半小時，超過的一定不是正常玩出來的
+max_official_score = 200000
 
 # ===== 學生沒寫時的預設值 =====
 default_player_name = '球員'
@@ -184,6 +215,7 @@ image_files = {
 	'shot': 'shot.png',
 	'goal': 'goal.png',
 	'background': 'background.png',
+	'school_background': 'background_school.png',
 }
 # 障礙物的圖片大小直接用上面碰撞框的數值，改了障礙物大小，圖片也會跟著變，兩邊不會對不起來。
 # 球員的圖比碰撞框寬一些（60 比 40），留空間給手臂，碰撞框窄一點玩起來也比較公平
@@ -198,6 +230,13 @@ image_sizes = {
 	# 背景照片只畫在草地上方（看台的位置），草地和邊線仍然用程式畫，球員才會一直踩在草地上。
 	# 照片會等比例縮放到蓋滿這塊區域，多出來的部分切掉，不會被拉扁
 	'background': (screen_width, stands_bottom),
+	'school_background': (screen_width, stands_bottom),
+}
+# 背景照片太高、要切掉上下時，保留哪個部分：0 是保留最上面，0.5 是保留中間，1 是保留最下面。
+# 台大總圖的照片下緣是草地，接在球場上面很自然，所以保留最下面；順安國中的照片下面是停車場，建築物在中間
+scenery_focus = {
+	'background': 1,
+	'school_background': 0.5,
 }
 # 背景照片蓋上一層半透明的黑色：0 是不變暗，255 是全黑。
 # 照片通常又亮又花，暗一點，球員、障礙物和上方的分數才看得清楚

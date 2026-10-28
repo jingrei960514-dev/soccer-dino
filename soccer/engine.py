@@ -25,6 +25,7 @@ if pygame_ready:
 	from soccer import drawing
 	from soccer import sound
 	from soccer import checks
+	from soccer import upload
 
 
 # 學生函式裡收到的 game 就是這個類別的物件。
@@ -38,6 +39,9 @@ class Game:
 		# 垂直速度；負數往上、正數往下，因為螢幕的 y 座標是往下增加的
 		self.vy = 0
 		self.lives = config.start_lives
+		# 官方模式比較難，命比較少；學生模式的命數由 on_hit 決定，這裡只是起始值
+		if mode == 'official':
+			self.lives = config.official_start_lives
 		# 畫面每一幀往左捲動幾像素
 		self.speed = config.start_speed
 		# 已經跳了幾次（二段跳用）；落地時引擎會自動歸零
@@ -74,6 +78,10 @@ class Game:
 		self.result = ''
 		# 0 到 1，代表離球門還有多遠，畫進度條用
 		self.progress = 0
+		# 官方模式結束時，自動登記分數的結果，畫在結束畫面上；空字串代表沒有自動登記
+		self.upload_message = ''
+		# 官方模式在第幾幀達到 school_background_score，背景換成順安國中；-1 代表還沒到
+		self.school_frame = -1
 
 		# ===== 官方模式產生無盡關卡用 =====
 		# 每一局都重新建立一個用固定種子的亂數產生器，所以每一局、每個人的關卡都一模一樣。
@@ -84,6 +92,10 @@ class Game:
 		self.slot_index = 0
 		# 距離上一個「要跳的障礙物」已經隔了幾格；用來避免球鞋緊跟在跳躍之後
 		self.slots_since_jump_obstacle = 99
+		# 上一格是不是組合障礙；組合常常要用二段跳，落地比較晚，所以下一格一定空著
+		self.previous_was_combo = False
+		# 這一格如果是兩個三角錐，它們之間的距離；每一組都不一樣，關卡才不會一直重複
+		self.cone_pair_gap = 0
 
 		# 記下 game 原本有哪些屬性。學生把名稱打錯（例如 game.live）時，Python 會多出一個新屬性，
 		# checks.py 拿這份清單比對就能發現。先放一個空清單，清單自己的名字才會被記進去
@@ -144,6 +156,7 @@ def run_official(student_globals):
 		return
 
 	problems = checks.check_player_settings(student_globals)
+	problems = problems + checks.check_upload_settings(student_globals)
 	if len(problems) > 0:
 		print_problems('【遊戲沒有開始】請先修正下面的問題：', problems)
 		return
@@ -252,11 +265,15 @@ def read_student_settings(student_globals):
 	return settings
 
 
-# 官方模式：只讀球員設定，規則換成引擎內建的函式。
+# 官方模式：只讀球員設定和計分板的連線設定，規則換成引擎內建的函式。
 # 內建函式和學生函式放在同一個位置，所以主迴圈完全不用分辨現在是哪一種模式。
 def read_official_settings(student_globals):
 	settings = read_player_settings(student_globals)
 	settings['mode'] = 'official'
+	# 送到計分板的名字和結束畫面一樣是「#背號 名字」，同名的同學才不會被當成同一個人
+	settings['player_label'] = '#' + settings['jersey_number'] + ' ' + settings['player_name']
+	settings['score_server'] = str(student_globals.get('score_server', '')).strip()
+	settings['match_code'] = str(student_globals.get('match_code', '')).strip()
 	settings['course'] = []
 	settings['on_jump_key'] = official_on_jump_key
 	settings['on_hit'] = official_on_hit
@@ -329,6 +346,9 @@ def play_one_round(screen, clock, fonts, images, sounds, settings):
 		# 2. 更新遊戲狀態；遊戲結束後就停住，只畫結束畫面
 		if not game.is_over:
 			update_game(game, settings)
+			# 官方模式在這一幀剛結束，就把分數送到計分板；每一局只會送一次
+			if game.is_over and game.mode == 'official':
+				game.upload_message = upload.send_score(settings, game.score)
 
 		# 3. 播放這一幀發生的音效（跳躍、撞到、撿球……），播完就清空
 		sound.play_sounds(sounds, game.sounds_to_play)
@@ -358,8 +378,7 @@ def build_course(game, course):
 def extend_official_course(game):
 	while game.next_slot_x < game.camera_x + config.screen_width + config.slot_width:
 		name = pick_official_item(game)
-		if name != 'gap':
-			game.things.append(make_thing(name, game.next_slot_x))
+		place_official_item(game, name, game.next_slot_x)
 		game.next_slot_x = game.next_slot_x + get_official_slot_width(game.slot_index)
 		game.slot_index = game.slot_index + 1
 
@@ -373,11 +392,13 @@ def get_official_slot_width(slot_index):
 
 
 # 決定官方關卡的下一格要放什麼。
-# 每一格只抽一次 random()，而且結果只跟「第幾格」有關、跟時間或玩家表現無關，
+# 每一格固定抽三次 random()（放什麼、要不要變成組合、組合的變化），而且結果只跟「第幾格」有關、跟時間或玩家表現無關，
 # 所以只要種子一樣，每個人遇到的關卡就完全一樣。
 # 不用 random.choice() 是因為不同 Python 版本的 choice 算法可能不同，random() 則保證相同。
 def pick_official_item(game):
 	roll = game.course_random.random()
+	combo_roll = game.course_random.random()
+	variant_roll = game.course_random.random()
 
 	# 難度從 0 慢慢增加到 1：愈後面，空白愈少
 	difficulty = game.slot_index / config.official_full_difficulty_slots
@@ -399,15 +420,66 @@ def pick_official_item(game):
 				name = pair[0]
 				break
 
-	# 公平性：剛跳過障礙物時球員還在空中，緊接著的球鞋一定躲不掉，所以改成空白
+	# 公平性：剛跳過障礙物時球員還在空中，緊接著的球鞋一定躲不掉，所以不放球鞋。
+	# 有 official_bonus_ball_chance 的機會改成足球，其他時候空白；全部變空白的話，後期幾乎每格都要跳，球會變得很少
 	if name == 'shoe' and game.slots_since_jump_obstacle < config.official_shoe_safe_slots:
-		name = 'gap'
+		name = pick_ball_or_gap(variant_roll)
 
-	if name == 'cone' or name == 'defender':
+	# 跑到第 official_combo_start_slot 格之後，三角錐和球鞋有機會變成組合，愈後面機會愈高：
+	# 'cone_pair' 是兩個靠近的三角錐，要抓準時機或用二段跳；'shoe_cone' 是球鞋後面緊接三角錐，要等球鞋飛過去馬上跳
+	combo_chance = get_official_combo_chance(game.slot_index)
+	if combo_roll < combo_chance:
+		if name == 'cone':
+			name = 'cone_pair'
+			# 從 official_cone_pair_gaps 裡挑一個距離：近的跳一次就過得去，遠的要用二段跳
+			gaps = config.official_cone_pair_gaps
+			game.cone_pair_gap = gaps[int(variant_roll * len(gaps))]
+		elif name == 'shoe':
+			name = 'shoe_cone'
+
+	# 公平性：組合後面緊接著障礙物的話，用二段跳躲過組合的人還沒落地就會撞到，所以不放障礙物。
+	# 有機會放一顆足球當作獎勵；足球撿到不會扣命，所以不影響公平
+	if game.previous_was_combo:
+		name = pick_ball_or_gap(variant_roll)
+	game.previous_was_combo = name == 'cone_pair' or name == 'shoe_cone'
+
+	if name == 'cone' or name == 'defender' or name == 'cone_pair' or name == 'shoe_cone':
 		game.slots_since_jump_obstacle = 0
 	else:
 		game.slots_since_jump_obstacle = game.slots_since_jump_obstacle + 1
 	return name
+
+
+# 不能放障礙物的格子，有 official_bonus_ball_chance 的機會放足球，其他時候空白。
+def pick_ball_or_gap(roll):
+	if roll < config.official_bonus_ball_chance:
+		return 'ball'
+	return 'gap'
+
+
+# 官方關卡第 slot_index 格變成組合的機率：從 official_combo_start_slot 格開始，
+# 每多一格就高一點，到 official_combo_full_slot 格時達到 official_combo_max_chance。
+def get_official_combo_chance(slot_index):
+	if slot_index < config.official_combo_start_slot:
+		return 0
+	progress = (slot_index - config.official_combo_start_slot) / (config.official_combo_full_slot - config.official_combo_start_slot)
+	if progress > 1:
+		progress = 1
+	return config.official_combo_max_chance * progress
+
+
+# 把 pick_official_item() 選好的東西放進關卡。組合會在同一格裡放兩個東西。
+def place_official_item(game, name, x):
+	if name == 'gap':
+		return
+	if name == 'cone_pair':
+		game.things.append(make_thing('cone', x))
+		game.things.append(make_thing('cone', x + game.cone_pair_gap))
+	elif name == 'shoe_cone':
+		game.things.append(make_thing('shoe', x))
+		game.things.append(make_thing('cone', x + config.official_shoe_cone_gap))
+	else:
+		game.things.append(make_thing(name, x))
 
 
 # 一個關卡元素就是一個字典。
@@ -492,6 +564,11 @@ def update_game(game, settings):
 	ball_points = game.balls_collected * config.ball_points
 	kick_points = game.defenders_kicked * config.kick_points
 	game.score = distance_points + ball_points + kick_points
+
+	# 官方模式分數一到門檻，記下是第幾幀，drawing.py 從這一幀開始換背景、顯示歡迎的字
+	if game.mode == 'official' and game.school_frame == -1 and game.score >= config.school_background_score:
+		game.school_frame = game.frame_count
+		game.sounds_to_play.append('win')
 
 	# 9. 學生模式才有球門：計算進度，並檢查是否抵達球門
 	if game.mode == 'student':
@@ -596,7 +673,10 @@ def check_collisions(game, settings):
 			# 撞到障礙物。先設定無敵再呼叫學生的 on_hit，
 			# 這樣就算學生在 on_hit 裡做了什麼，同一幀也不會被下一個障礙物再撞一次
 			thing['done'] = True
-			game.invincible_timer = config.invincible_frames
+			if game.mode == 'official':
+				game.invincible_timer = config.official_invincible_frames
+			else:
+				game.invincible_timer = config.invincible_frames
 			game.sounds_to_play.append('hit')
 			call_student_function(settings, 'on_hit', game)
 

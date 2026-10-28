@@ -60,8 +60,8 @@ def load_images():
 		except pygame.error:
 			print('assets 裡的 ' + file_name + ' 讀不出來，改用幾何圖形。請確認它是 png 或 jpg 圖檔。')
 			continue
-		if name == 'background':
-			images[name] = make_scenery(image)
+		if name == 'background' or name == 'school_background':
+			images[name] = make_scenery(image, config.scenery_focus[name])
 		else:
 			# 縮放成固定大小，不管原圖多大，碰撞判定都和畫面上看到的一樣
 			images[name] = pygame.transform.smoothscale(image, config.image_sizes[name])
@@ -69,9 +69,10 @@ def load_images():
 
 
 # 把背景照片做成草地上方的遠景：等比例縮放到剛好蓋滿這塊區域，多出來的部分切掉，再整張調暗。
+# focus 決定照片太高時保留哪個部分，0 是最上面、1 是最下面，說明在 config.py 的 scenery_focus。
 # 不直接拉成固定大小，因為照片的比例通常和這塊又寬又扁的區域差很多，硬拉會變形。
 # 調暗只在載入時做一次，每一幀直接貼上，不會拖慢遊戲。
-def make_scenery(image):
+def make_scenery(image, focus):
 	width, height = config.image_sizes['background']
 	# 取「寬要放大幾倍」和「高要放大幾倍」比較大的那個，兩邊才都蓋得滿
 	scale = max(width / image.get_width(), height / image.get_height())
@@ -82,8 +83,8 @@ def make_scenery(image):
 	scenery = pygame.Surface((width, height))
 	# 先塗天空色：照片有透明的地方，就會透出天空，而不是黑色
 	scenery.fill(config.sky_color)
-	# 左右置中、對齊底部：照片的下緣通常是地面或樹木，接在草地上面比較自然，切掉的是天空
-	scenery.blit(scaled, ((width - scaled_width) // 2, height - scaled_height))
+	# 左右置中；上下依照 focus 對齊。height - scaled_height 是負數，代表照片要往上移多少才會對齊底部
+	scenery.blit(scaled, ((width - scaled_width) // 2, int((height - scaled_height) * focus)))
 
 	dim = pygame.Surface((width, height), pygame.SRCALPHA)
 	dim.fill((0, 0, 0, config.background_dim))
@@ -103,7 +104,7 @@ def draw_image(screen, image, left, bottom):
 
 # 依照「由遠到近」的順序畫，後畫的會蓋住先畫的。
 def draw_frame(screen, fonts, images, game, settings):
-	draw_background(screen, images, game.camera_x)
+	draw_background(screen, images, game)
 	# 官方模式是無盡關卡，沒有球門
 	if game.mode == 'student':
 		draw_goal(screen, images, game.goal_x - game.camera_x)
@@ -113,6 +114,7 @@ def draw_frame(screen, fonts, images, game, settings):
 		draw_shot(screen, images, shot, game.camera_x, game.frame_count)
 	draw_player(screen, fonts, images, game, settings)
 	draw_hud(screen, fonts, game, settings)
+	draw_school_banner(screen, fonts, images, game)
 	if game.is_over:
 		draw_end_screen(screen, fonts, game, settings)
 
@@ -120,15 +122,37 @@ def draw_frame(screen, fonts, images, game, settings):
 # ===== 背景 =====
 
 # 背景：草地上方有 background.png 就貼照片，沒有就畫天空和看台。
+# 官方模式分數到門檻之後，再慢慢換成 background_school.png。
 # 草地和邊線一定用程式畫，換了什麼照片，球員都會踩在草地上。
 # 腳下的小草會跟著捲動，讓玩家感覺到速度。
-def draw_background(screen, images, camera_x):
+def draw_background(screen, images, game):
 	if 'background' in images:
 		screen.blit(images['background'], (0, 0))
 	else:
 		draw_stadium(screen)
-	draw_field(screen, camera_x)
-	draw_grass_tufts(screen, camera_x)
+
+	if game.school_frame != -1 and 'school_background' in images:
+		# 換背景之後經過幾幀；還在交替的時間內，新照片從透明慢慢變清楚，蓋在舊的上面
+		frames_since = game.frame_count - game.school_frame
+		school = images['school_background']
+		if frames_since < config.school_fade_frames:
+			school.set_alpha(int(255 * frames_since / config.school_fade_frames))
+		else:
+			school.set_alpha(255)
+		screen.blit(school, (0, 0))
+
+	draw_field(screen, game.camera_x)
+	draw_grass_tufts(screen, game.camera_x)
+
+
+# 剛換成順安國中的背景時，在畫面中間顯示歡迎的字，過一段時間就消失。
+# 沒有放 background_school.png 的話背景不會換，字也不顯示
+def draw_school_banner(screen, fonts, images, game):
+	if game.school_frame == -1 or 'school_background' not in images:
+		return
+	if game.frame_count - game.school_frame > config.school_banner_frames:
+		return
+	draw_text(screen, fonts['large'], config.school_banner_text, config.win_color, config.screen_width // 2, 130, 'center')
 
 
 # 用幾何圖形畫出草地上方的天空和看台。
@@ -637,6 +661,9 @@ def draw_end_screen(screen, fonts, game, settings):
 		name_text = '#' + settings['jersey_number'] + ' ' + settings['player_name']
 		draw_text(screen, fonts['huge'], name_text, config.text_color, center_x, 110, 'center')
 		draw_text(screen, fonts['huge'], str(game.score) + ' 分', config.win_color, center_x, 230, 'center')
+		# 有自動登記到計分板時，告訴學生結果；沒有自動登記（空字串）就不畫
+		if game.upload_message != '':
+			draw_text(screen, fonts['medium'], game.upload_message, config.text_color, center_x, 340, 'center')
 		draw_text(screen, fonts['small'], '按 R 或 Enter 再玩一次，按 Esc 離開', config.text_color, center_x, 400, 'center')
 		return
 

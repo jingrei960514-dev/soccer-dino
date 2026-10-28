@@ -10,7 +10,7 @@
 2. **逐項修好**：由上到下有四個問題，第一個改關卡清單，其他三個是填空，把 `______` 換成正確的程式。
 3. **改成自己的版本**：名字、球衣顏色、背號、關卡都可以改；做得快的同學挑戰二段跳和射門。
 4. **同學互玩**。
-5. **官方比賽**：大家玩同一個固定的關卡，助教用計分板登記分數。
+5. **官方比賽**：大家玩同一個固定的關卡，分數自動登記到投影的計分板，每個人只留最高分。
 
 學生只在 notebook 裡寫很短的程式，遊戲迴圈、畫面、碰撞都由引擎處理。修好之後，學生的程式長這樣：
 
@@ -55,6 +55,7 @@ python -m pip install pygame jupyterlab
 python teacher/run.py                    執行 solution.ipynb（全部修好的版本）
 python teacher/run.py game.ipynb         執行壞掉的版本
 python teacher/run.py official.ipynb     執行官方比賽版本
+python teacher/score_server.py           開啟計分板伺服器，再打開 http://localhost:8765
 ```
 
 ## 操作方式
@@ -86,9 +87,12 @@ Soccer/
 | `soccer/drawing.py` | 畫面 |
 | `soccer/sound.py` | 音效 |
 | `soccer/checks.py` | 防呆檢查與中文錯誤訊息 |
+| `soccer/upload.py` | 官方模式結束時把分數送到計分板 |
 | `soccer/assets/` | 選用的圖片和音效，說明在 `soccer/assets/README.md` |
 | `teacher/solution.ipynb` | 全部修好的教師版 |
-| `teacher/scoreboard.html` | 比賽計分板，單一檔案、不需網路，用瀏覽器打開後投影 |
+| `teacher/scoreboard.html` | 比賽計分板，用瀏覽器打開後投影 |
+| `teacher/score_server.py` | 計分板伺服器，學生的分數會自動登記 |
+| `teacher/test_official.py` | 讓電腦自動玩官方模式，檢查難度和公平性 |
 | `teacher/run.py` | 不開 Jupyter，直接執行 notebook |
 | `teacher/make_game_notebook.py` | 從 `solution.ipynb` 產生 `game.ipynb` |
 | `teacher/clear_outputs.py` | 清除 notebook 的執行結果 |
@@ -104,6 +108,7 @@ Soccer/
 
 - **防呆**：遊戲開始前會檢查學生的設定，打錯字時提示最像的正確名稱。學生的函式出錯時，會先關掉視窗，再用繁體中文說明哪個函式、哪一行出錯，以及可能的原因。
 - **官方模式**：無盡關卡、持續加速。關卡用固定的亂數種子產生，每個人遇到的完全一樣，分數才能互相比較。
+- **自動登記分數**：老師電腦執行 `python teacher/score_server.py`，學生在 `official.ipynb` 填上計分板顯示的 IP 和比賽代碼，每玩完一局分數就自動出現在排行榜上。只用 Python 內建的模組；伺服器沒開也能照常手動登記。
 - **可以重複執行**：在同一個 Jupyter kernel 裡重複執行、中途出錯、按中斷，都能馬上再玩一次。
 - **換素材不用改程式**：把圖檔或音效檔放進 `soccer/assets/` 就會自動使用，沒放也能玩。
 - **減少頭暈**：背景和看台不捲動，只有腳下的小草跟著動。
@@ -116,6 +121,8 @@ Soccer/
 | 改 notebook 內容 | 改 `teacher/solution.ipynb`，再執行 `python teacher/make_game_notebook.py` 重新產生 `game.ipynb` |
 | 改錯誤訊息的用語 | 改 `soccer/checks.py`，並同步更新 `teacher/TEACHER_GUIDE.md` |
 | 換一套官方關卡 | 改 `soccer/config.py` 的 `official_seed` |
+| 調整官方難度 | 改 `soccer/config.py` 官方模式那一段，再執行 `python teacher/test_official.py` 檢查，並改 `official_seed` |
+| 換背景的分數門檻 | 改 `soccer/config.py` 的 `school_background_score`（目前 2000） |
 | 交給學生之前 | 執行 `python teacher/clear_outputs.py` |
 
 ## 程式碼規範

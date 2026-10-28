@@ -32,14 +32,17 @@
 | `soccer/checks.py` | 防呆：遊戲開始前檢查學生的設定，遊戲中把學生函式的錯誤翻譯成中文說明。所有給學生看的錯誤訊息都在這裡。 |
 | `soccer/drawing.py` | 所有畫圖的程式。每種角色一個 `draw_` 函式，先找 `assets/` 裡的圖檔，找不到才用幾何圖形。 |
 | `soccer/sound.py` | 音效：載入 `assets/` 裡的音效檔，找不到就用程式產生嗶聲；沒有喇叭時自動靜音。 |
+| `soccer/upload.py` | 官方模式結束一局時，把分數送到 `teacher/score_server.py`，回傳要畫在結束畫面上的結果。送不出去不會讓遊戲出錯。 |
 | `soccer/assets/` | 放圖片和音效的資料夾，檔名與大小寫在裡面的 `README.md`。空的也能玩。 |
 | `teacher/run.py` | 開發用的入口，讀出 notebook 裡的程式格直接執行，不用開 Jupyter。`python teacher/run.py` 執行 solution.ipynb，`python teacher/run.py game.ipynb` 執行其他 notebook。 |
 | `teacher/solution.ipynb` | 教師版 notebook，全部問題都已修好。也是破壞版的來源。 |
 | `game.ipynb` | 學生拿到的破壞版，由 `make_game_notebook.py` 產生，**不要直接修改**。 |
-| `official.ipynb` | 官方比賽用的 notebook，只設定球員，最後一格呼叫 `engine.run_official(globals())`。 |
+| `official.ipynb` | 官方比賽用的 notebook，只設定球員和比賽登記（`score_server`、`match_code`），最後一格呼叫 `engine.run_official(globals())`。 |
 | `teacher/make_game_notebook.py` | 從 solution.ipynb 產生 game.ipynb：找出特定的格子換成破壞版內容，並清除執行結果。 |
 | `teacher/clear_outputs.py` | 清除 notebook 的執行結果，交給學生之前執行。沒有指定檔案時，會清除最外層和 `teacher/` 裡所有的 notebook。 |
-| `teacher/scoreboard.html` | 官方比賽的計分板，單一檔案、不需網路，用瀏覽器打開後投影。 |
+| `teacher/scoreboard.html` | 官方比賽的計分板。由 `score_server.py` 提供時（網址是 `http://`）每兩秒向伺服器要一次名單；直接打開檔案時（`file://`）資料存在瀏覽器的 localStorage，只能手動輸入。 |
+| `teacher/test_official.py` | 讓電腦自動玩官方模式幾十局，統計能撐多久、拿幾分，並確認關卡沒有躲不掉的組合。調整官方難度之後執行。 |
+| `teacher/score_server.py` | 計分板伺服器，只用 Python 內建的 `http.server`。提供計分板頁面、接收學生送來的分數、每個人只留最高分，存在 `teacher/scores.json`。 |
 | `teacher/TEACHER_GUIDE.md` | 教師手冊：課前準備、參考答案、提示卡、所有錯誤訊息、常見問題。 |
 
 ## notebook 怎麼被執行
@@ -92,7 +95,7 @@ Jupyter 有一個要注意的地方：kernel 會記住所有執行過的東西�
 | `game.over()` | 讓遊戲結束 |
 | `game.shoot()` | 射出一顆貼地的球，碰到防守球員就把他踢飛 |
 
-引擎自己用的：`mode`、`shots`（射出去的球）、`sounds_to_play`（這一幀要播的音效）、`known_attributes`（抓打錯字用）、`defenders_kicked`、`player_y`（球員腳底高度）、`camera_x`（畫面捲了多遠）、`things`（關卡元素清單）、`goal_x`、`invincible_timer`、`tick_timer`、`frame_count`、`is_over`、`result`、`progress`。
+引擎自己用的：`mode`、`shots`（射出去的球）、`sounds_to_play`（這一幀要播的音效）、`known_attributes`（抓打錯字用）、`defenders_kicked`、`player_y`（球員腳底高度）、`camera_x`（畫面捲了多遠）、`things`（關卡元素清單）、`goal_x`、`invincible_timer`、`tick_timer`、`frame_count`、`is_over`、`result`、`progress`、`upload_message`（官方模式自動登記的結果）、`school_frame`（換成順安國中背景的那一幀）、`previous_was_combo`。
 
 ## 座標怎麼算
 
@@ -120,7 +123,7 @@ Jupyter 有一個要注意的地方：kernel 會記住所有執行過的東西�
 | 讀取設定 | `read_student_settings()` | `read_official_settings()` |
 | 規則函式 | 學生寫的 `on_jump_key` 等 | 引擎內建的 `official_on_jump_key` 等 |
 | 關卡 | 開始時 `build_course()` 一次產生 | 每一幀 `extend_official_course()` 往前補 |
-| 結束 | 抵達球門，或學生呼叫 `game.over()` | 命用完 |
+| 結束 | 抵達球門，或學生呼叫 `game.over()` | `official_start_lives` 條命用完 |
 | 畫面 | 有球門、有進度條 | 顯示「官方版本」，結束畫面用大字 |
 
 兩種模式共用 `read_player_settings()`（名字、球衣、背號）和 `start_game()`（開視窗、主迴圈、關視窗）。官方模式把內建函式放進 `settings` 裡學生函式的位置，所以主迴圈完全不用分辨現在是哪一種模式。
@@ -128,13 +131,30 @@ Jupyter 有一個要注意的地方：kernel 會記住所有執行過的東西�
 ### 官方關卡怎麼保證每個人都一樣
 
 - 每一局建立一個 `random.Random(config.official_seed)`，只給關卡用。學生程式裡用 `random` 不會影響它。
-- 每一格只呼叫一次 `random()`，再自己換算成要放什麼。不用 `random.choice()`，因為不同 Python 版本的算法可能不同。
-- 難度（空白的機率）和格子寬度都只跟「第幾格」有關，跟時間、玩家表現無關。
+- 每一格固定呼叫三次 `random()`（放什麼、要不要變成組合、組合的變化），再自己換算成要放什麼。不用 `random.choice()`，因為不同 Python 版本的算法可能不同。
+- 難度（空白的機率、組合的機率）和格子寬度都只跟「第幾格」有關，跟時間、玩家表現無關。
 
 ### 官方關卡怎麼保證公平
 
 - 跳過障礙物後的 `official_shoe_safe_slots` 格內不放球鞋，免得球員還在空中就被打到。
 - 格子寬度隨格子編號從 340 慢慢加寬到 720。速度變快後，跳一次會在空中跑得更遠；格子不變寬的話，連續兩個障礙物會躲不掉。
+- 組合障礙（`cone_pair` 兩個三角錐、`shoe_cone` 球鞋接三角錐）的下一格一定不放障礙物。組合常常要用二段跳，落地比較晚，緊接著障礙物就躲不掉。
+- 不能放障礙物的格子（組合的下一格、太靠近障礙物的球鞋）有 `official_bonus_ball_chance` 的機會改放足球，其他時候空白。後期幾乎每格都有要跳的障礙物，全部變空白的話球會變得很少。
+- 兩個三角錐的距離每一組都從 `official_cone_pair_gaps` 裡挑，有近的（跳一次就過）也有遠的（要二段跳），關卡才不會一直重複。
+
+### 官方模式為什麼會愈來愈難
+
+單獨一個三角錐，「按跳躍還躲得過」的時間大約有 30 幀（半秒），而且不管速度多快都差不多，因為通過一個 26 像素寬的碰撞框只要幾幀。所以光是加速並不會變難，真正讓人撞到的是**障礙物彼此限制**：前一個還沒落地，下一個就到了。官方模式靠這幾件事提高難度：
+
+- 速度一直加到 `official_max_speed`（20），格子的寬度卻在第 76 格就不再加寬。
+- 第 `official_combo_start_slot` 格之後開始出現組合障礙，機率慢慢升到 `official_combo_max_chance`。
+- 只有 `official_start_lives` 條命，被撞之後的無敵時間也比較短（`official_invincible_frames`）。
+
+調整這些數值之後，用 `python teacher/test_official.py` 讓電腦自動玩幾十局，看看平均撐多久，並確認「完全沒有誤差」的那一局不會撞到（會撞到代表出現了躲不掉的組合）。目前的設定大約撐 1 到 3 分鐘，中間值約 80 秒。**改了關卡相關的數值，也要改 `official_seed`**：計分板只比對種子，種子沒改的話，拿到舊版檔案的同學分數也會被接受。
+
+### 換成順安國中的背景
+
+官方模式的分數一到 `school_background_score`，`update_game()` 記下 `game.school_frame`（第幾幀）並播放歡呼聲。`draw_background()` 從這一幀開始，用 `school_fade_frames` 幀讓 `background_school.png` 從透明慢慢蓋過原本的背景；`draw_school_banner()` 在畫面中間顯示 `school_banner_text`，維持 `school_banner_frames` 幀。`assets` 裡沒有這張圖時，背景不換、字也不顯示。
 
 ## 程式執行流程
 
@@ -169,6 +189,8 @@ engine.run(globals())               engine.run_official(globals())
 	7. 無敵時間倒數。
 	8. 計算分數（跑的距離 + 撿到的球 + 踢飛的防守球員）。
 	9. 學生模式才有：計算進度，球員碰到球門就過關。
+
+	官方模式在 `update_game()` 之後，如果這一幀剛結束，就呼叫 `upload.send_score()` 把分數送到計分板，結果存在 `game.upload_message`。每一局只送一次；連不到時最多等 `score_upload_timeout` 秒。
 3. `sound.play_sounds()`：播放這一幀放進 `game.sounds_to_play` 的音效，播完清空。
 4. `drawing.draw_frame()`：由遠到近畫背景、球門、關卡元素、球員、上方資訊；遊戲結束時再蓋上結束畫面。
 5. `pygame.display.flip()` 把畫好的畫面顯示出來，`clock.tick()` 等待到下一幀。
@@ -260,6 +282,22 @@ engine.run(globals())               engine.run_official(globals())
 - 找不到 pygame 時，`from soccer import engine` 不會出錯，執行最後一格時才印出中文說明，並告訴助教這個 kernel 用的是哪個 Python。
 - 在 Jupyter 按「中斷」時，接住 `KeyboardInterrupt`，關掉視窗並印出一句說明，不顯示 traceback。
 - 不管怎麼結束（正常、出錯、中斷），`pygame.quit()` 都在 `finally` 裡，同一個 kernel 可以馬上再執行一次。
+
+## 自動登記分數怎麼運作
+
+```
+學生電腦                                     老師電腦（teacher/score_server.py）
+upload.send_score()  ── POST /api/scores ──→  檢查比賽代碼、關卡種子、分數範圍
+                                              只留最高分，存進 teacher/scores.json
+結束畫面顯示結果      ←── result、best ────    回覆 new / better / lower，或中文的錯誤理由
+                                                    ↑
+scoreboard.html（老師電腦的瀏覽器） ── 每兩秒 GET /api/scores ──┘
+```
+
+- 送出的名字是 `read_official_settings()` 組好的「#背號 名字」。
+- 送出的 `seed` 是 `config.official_seed`，伺服器拿自己的比對；學生改過 `config.py` 或拿到舊版，分數就不算。
+- 從 `127.0.0.1` 連進來的（也就是老師電腦上的計分板）才能手動加分、刪除、清除，以及拿到比賽代碼和 IP。
+- 伺服器一次只處理一個連線，不用擔心兩筆分數同時寫檔；每個連線最多等 5 秒，有人卡住也不會拖住其他人。
 
 ## 為什麼這樣設計
 

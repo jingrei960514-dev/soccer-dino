@@ -5,10 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>足球小恐龍排行榜</title>
 <!--
-	官方比賽的計分板。用瀏覽器直接打開這個檔案就能用，不需要網路。
-	助教輸入名字和分數，按 Enter 加入，名單會自動由高到低排序，前三名放大顯示。
-	資料存在這台電腦的瀏覽器裡（localStorage），不小心重新整理或關掉也不會消失；
-	換一台電腦或換一個瀏覽器就看不到，所以比賽結束後記得按「下載 CSV」留存。
+	官方比賽的計分板，有兩種用法：
+	1. 自動登記：執行 python teacher/score_server.py，再打開 http://localhost:8765。
+	   最上面會顯示學生要在 official.ipynb 填的 IP 和比賽代碼，學生每玩完一局，分數就自動出現。
+	   資料存在伺服器旁邊的 teacher/scores.json。
+	2. 手動登記：用瀏覽器直接打開這個檔案，不需要網路。
+	   資料存在這台電腦的瀏覽器裡（localStorage），不小心重新整理或關掉也不會消失；
+	   換一台電腦或換一個瀏覽器就看不到，所以比賽結束後記得按「下載 CSV」留存。
+	兩種用法都可以由助教輸入名字和分數，按 Enter 加入。名單會自動由高到低排序，每個人只留最高分，前三名放大顯示。
 	投影時按 F11 可以全螢幕。
 -->
 <style>
@@ -55,6 +59,19 @@
 		font-size: 28px;
 		vertical-align: middle;
 		letter-spacing: 0;
+	}
+
+	/* ===== 學生要填的連線資料（只有自動登記時才顯示） ===== */
+	.connect {
+		margin: 0 auto 20px;
+		padding: 12px 24px;
+		max-width: 900px;
+		border-radius: 12px;
+		background: var(--panel);
+		font-family: Consolas, 'Courier New', monospace;
+		font-size: 30px;
+		text-align: center;
+		overflow-wrap: anywhere;
 	}
 
 	/* ===== 輸入區 ===== */
@@ -303,6 +320,8 @@
 <body>
 	<h1>足球小恐龍排行榜<span class="badge">官方版本</span></h1>
 
+	<div class="connect" id="connect" hidden></div>
+
 	<form class="entry" id="entry-form">
 		<input id="name-input" placeholder="名字（例如 #10 小明）" autocomplete="off">
 		<input id="score-input" placeholder="分數" inputmode="numeric" autocomplete="off">
@@ -321,16 +340,25 @@
 <script>
 	// 存在瀏覽器裡用的名稱；同一台電腦打開這個檔案都會讀到同一份資料
 	const storage_key = 'soccer_dino_scoreboard';
+	// 用 score_server.py 打開時網址是 http://，分數存在伺服器；直接打開檔案時是 file://，分數存在瀏覽器
+	const server_mode = location.protocol === 'http:';
+	// 伺服器模式每隔幾毫秒去問一次最新名單，學生的分數才會自動出現
+	const refresh_interval = 2000;
 
 	// 這三個要放在最前面：下面的 load_records() 讀不到儲存空間時會呼叫 show_message()，那時 message 必須已經存在
 	const name_input = document.getElementById('name-input');
 	const score_input = document.getElementById('score-input');
 	const message = document.getElementById('message');
 
-	// 所有紀錄，每一筆是 { name: 名字, score: 分數 }
-	let records = load_records();
+	// 所有紀錄，每一筆是 { name: 名字, score: 分數 }。伺服器模式先放空的，等第一次問到名單再填
+	let records = [];
+	if (!server_mode) {
+		records = load_records();
+	}
 	// 剛加入的名字，畫面更新時讓那一列閃一下
 	let just_added_name = '';
+	// 上一次有沒有連上伺服器；斷線和恢復時各提示一次就好，不要每兩秒洗一次訊息
+	let server_ok = true;
 
 	// ===== 讀寫瀏覽器的儲存空間 =====
 
@@ -359,9 +387,76 @@
 		message.textContent = text;
 	}
 
+	// ===== 和伺服器溝通 =====
+
+	// 送一份 JSON 給伺服器，回傳伺服器回覆的 JSON。伺服器拒絕時，把它寫好的中文理由當成錯誤丟出來
+	async function post_json(path, value) {
+		const response = await fetch(path, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(value),
+		});
+		const reply = await response.json();
+		if (!response.ok) {
+			throw new Error(reply.error);
+		}
+		return reply;
+	}
+
+	// 向伺服器要最新的名單。和畫面上的名單比較，有新分數或刷新紀錄的就閃一下，並寫出是誰
+	async function refresh_from_server() {
+		let reply;
+		try {
+			const response = await fetch('/api/scores');
+			reply = await response.json();
+		} catch (error) {
+			if (server_ok) {
+				show_message('連不到計分板伺服器，請確認 score_server.py 還開著。畫面上的名單是斷線前的。');
+			}
+			server_ok = false;
+			return;
+		}
+		if (!server_ok) {
+			show_message('已重新連上計分板伺服器。');
+		}
+		server_ok = true;
+
+		for (const record of reply.records) {
+			const old_record = find_record(record.name);
+			if (old_record === null) {
+				just_added_name = record.name;
+				show_message('自動登記：' + record.name + '　' + record.score + ' 分');
+			} else if (record.score > old_record.score) {
+				just_added_name = record.name;
+				show_message(record.name + ' 刷新紀錄：' + old_record.score + ' → ' + record.score + ' 分');
+			}
+		}
+		records = reply.records;
+		show_connect_info(reply.addresses, reply.code);
+		draw();
+	}
+
+	// 在最上面用大字寫出學生要填什麼，投影出來全班都看得到
+	function show_connect_info(addresses, code) {
+		const connect = document.getElementById('connect');
+		connect.innerHTML = '';
+		// 伺服器只把比賽代碼給它自己那台電腦；從別台電腦打開計分板時看不到，就不顯示
+		if (code === undefined) {
+			connect.hidden = true;
+			return;
+		}
+		connect.hidden = false;
+		let server_text = '（找不到這台電腦的 IP，請檢查網路）';
+		if (addresses.length > 0) {
+			server_text = '\'' + addresses.join('\' 或 \'') + '\'';
+		}
+		connect.appendChild(make_element('div', '', 'score_server = ' + server_text));
+		connect.appendChild(make_element('div', '', 'match_code = \'' + code + '\''));
+	}
+
 	// ===== 加入分數 =====
 
-	document.getElementById('entry-form').addEventListener('submit', function (event) {
+	document.getElementById('entry-form').addEventListener('submit', async function (event) {
 		// 表單送出時瀏覽器預設會重新整理頁面，要先擋下來
 		event.preventDefault();
 
@@ -381,27 +476,64 @@
 		}
 		const score = parseInt(score_text, 10);
 
-		// 同一個人玩好幾次時只留最高分，名單才不會被同一個人洗版
+		// 同一個人玩好幾次時只留最高分，名單才不會被同一個人洗版。
+		// 伺服器模式由伺服器決定要不要更新，畫面上的提示和直接打開檔案時一樣
 		const old_record = find_record(name);
-		if (old_record === null) {
-			records.push({ name: name, score: score });
-			show_message('已加入：' + name + '　' + score + ' 分');
-		} else if (score > old_record.score) {
-			show_message(name + ' 刷新紀錄：' + old_record.score + ' → ' + score + ' 分');
-			old_record.score = score;
+		// 先記下原本的分數：下面更新名單時 old_record.score 會被改掉，提示裡就寫不出「從幾分刷新到幾分」
+		let old_score = 0;
+		if (old_record !== null) {
+			old_score = old_record.score;
+		}
+		let result;
+		if (server_mode) {
+			try {
+				const reply = await post_json('/api/scores', { name: name, score: score, manual: true });
+				result = reply.result;
+			} catch (error) {
+				show_message('沒有登記成功：' + error.message);
+				return;
+			}
+			// 先把新的分數記在畫面上的名單裡，等一下 refresh_from_server() 才不會把它當成學生自動登記的，蓋掉下面的提示
+			add_score_locally(name, score);
 		} else {
-			show_message(name + ' 已經有 ' + old_record.score + ' 分，這次沒有比較高，保留原本的分數。');
+			result = add_score_locally(name, score);
+			save_records();
+		}
+
+		if (result === 'new') {
+			show_message('已加入：' + name + '　' + score + ' 分');
+		} else if (result === 'better') {
+			show_message(name + ' 刷新紀錄：' + old_score + ' → ' + score + ' 分');
+		} else {
+			show_message(name + ' 已經有 ' + old_score + ' 分，這次沒有比較高，保留原本的分數。');
 		}
 
 		just_added_name = name;
-		save_records();
-		draw();
+		if (server_mode) {
+			await refresh_from_server();
+		} else {
+			draw();
+		}
 
 		// 清空輸入框，游標回到名字，助教可以馬上輸入下一位
 		name_input.value = '';
 		score_input.value = '';
 		name_input.focus();
 	});
+
+	// 只留最高分的規則。回傳 'new'（第一次登記）、'better'（刷新紀錄）或 'lower'（沒有比較高）
+	function add_score_locally(name, score) {
+		const old_record = find_record(name);
+		if (old_record === null) {
+			records.push({ name: name, score: score });
+			return 'new';
+		}
+		if (score > old_record.score) {
+			old_record.score = score;
+			return 'better';
+		}
+		return 'lower';
+	}
 
 	function find_record(name) {
 		for (const record of records) {
@@ -412,11 +544,21 @@
 		return null;
 	}
 
-	function delete_record(name) {
+	async function delete_record(name) {
+		if (server_mode) {
+			try {
+				await post_json('/api/delete', { name: name });
+			} catch (error) {
+				show_message('沒有刪除成功：' + error.message);
+				return;
+			}
+		}
 		records = records.filter(function (record) {
 			return record.name !== name;
 		});
-		save_records();
+		if (!server_mode) {
+			save_records();
+		}
 		show_message('已刪除：' + name);
 		draw();
 	}
@@ -524,21 +666,41 @@
 		}, 1000);
 	});
 
-	document.getElementById('clear-button').addEventListener('click', function () {
-		if (records.length === 0) {
+	document.getElementById('clear-button').addEventListener('click', async function () {
+		// 伺服器模式就算名單是空的也可以清除，用來換一組新的比賽代碼
+		if (records.length === 0 && !server_mode) {
 			return;
 		}
 		// 清除之後救不回來，所以要再確認一次
-		if (confirm('確定要清除全部 ' + records.length + ' 筆紀錄嗎？清除後無法復原。')) {
-			records = [];
-			save_records();
-			show_message('已清除全部紀錄。');
-			draw();
+		let question = '確定要清除全部 ' + records.length + ' 筆紀錄嗎？清除後無法復原。';
+		if (server_mode) {
+			question = question + '比賽代碼也會換一組新的，學生要重新填 match_code。';
 		}
+		if (!confirm(question)) {
+			return;
+		}
+		records = [];
+		if (server_mode) {
+			try {
+				await post_json('/api/clear', {});
+			} catch (error) {
+				show_message('沒有清除成功：' + error.message);
+				return;
+			}
+			await refresh_from_server();
+		} else {
+			save_records();
+		}
+		show_message('已清除全部紀錄。');
+		draw();
 	});
 
 	draw();
 	name_input.focus();
+	if (server_mode) {
+		refresh_from_server();
+		setInterval(refresh_from_server, refresh_interval);
+	}
 </script>
 </body>
 </html>

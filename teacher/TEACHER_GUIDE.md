@@ -11,14 +11,16 @@
 | 檔案 | 給誰 | 用途 |
 | --- | --- | --- |
 | `game.ipynb` | 學生 | 壞掉的版本，學生從這裡開始修 |
-| `official.ipynb` | 學生 | 官方比賽用，只能改球員設定 |
-| `soccer/engine.py`、`config.py`、`drawing.py`、`sound.py`、`checks.py` | 不用打開 | 遊戲引擎，`soccer` 資料夾必須和學生的 notebook 放在同一層 |
+| `official.ipynb` | 學生 | 官方比賽用，只能改球員設定和比賽登記 |
+| `soccer/engine.py`、`config.py`、`drawing.py`、`sound.py`、`checks.py`、`upload.py` | 不用打開 | 遊戲引擎，`soccer` 資料夾必須和學生的 notebook 放在同一層 |
 | `soccer/assets/` | 選用 | 放圖片和音效，說明在 `soccer/assets/README.md` |
 | `teacher/solution.ipynb` | 老師 | 全部修好的版本，也是 `game.ipynb` 的來源 |
 | `teacher/scoreboard.html` | 助教 | 比賽計分板，用瀏覽器打開後投影 |
+| `teacher/score_server.py` | 助教 | 計分板伺服器，開著的話學生的分數會自動登記 |
 | `teacher/clear_outputs.py` | 老師 | 清除 notebook 的執行結果 |
 | `teacher/make_game_notebook.py` | 老師 | 修改 `solution.ipynb` 之後，重新產生 `game.ipynb` |
 | `teacher/run.py` | 開發用 | 不開 Jupyter，直接在終端機執行 notebook |
+| `teacher/test_official.py` | 老師 | 讓電腦自動玩官方模式，檢查難度 |
 
 ## 一、課前準備
 
@@ -36,7 +38,7 @@
 	```
 	python teacher/clear_outputs.py
 	```
-6. **計分板**：用要投影的那台電腦打開 `teacher/scoreboard.html`，確認字夠大。
+6. **計分板**：在要投影的那台電腦執行 `python teacher/score_server.py`，打開 `http://localhost:8765`，確認字夠大。再拿一台學生電腦，照計分板上的 IP 和比賽代碼填好 `official.ipynb` 玩一局，確認分數會自動出現（見「七、官方比賽」）。學校網路連不通的話，改用手動登記就好。
 
 如果一台電腦上有好幾個 Python，Jupyter 可能用到沒裝 pygame 的那一個。遊戲會顯示「這台電腦的 Python 沒有安裝 pygame」，並列出這個 kernel 用的是哪個 Python，照訊息裡的指令安裝，或在 Jupyter 右上角換 kernel 即可。
 
@@ -84,7 +86,7 @@ notebook 的程式格也會套用這個設定。
 | 10 - 35 分 | 修四個問題 | 由上到下依序修：問題一（關卡）→ 問題二（跳躍）→ 問題三（撞到）→ 問題四（加速），每修好一個就重玩一次 |
 | 35 - 45 分 | 自由修改、挑戰題 | 改名字、球衣、關卡；做得快的同學挑戰二段跳和射門 |
 | 45 - 50 分 | 同學互玩 | 互相玩對方設計的關卡 |
-| 50 - 60 分 | 官方比賽 | 打開 `official.ipynb`，玩完由助教登記分數 |
+| 50 - 60 分 | 官方比賽 | 打開 `official.ipynb`，填上計分板顯示的 IP 和比賽代碼，玩完分數自動登記 |
 
 時間只是建議，可以依學生的進度調整。
 
@@ -104,6 +106,8 @@ notebook 的程式格也會套用這個設定。
 | `jersey_number` | 背號，最多 3 位數 | `10` |
 | `course` | 關卡清單，可以用的名稱見下表，最多 1000 個 | 一個簡單的預設關卡 |
 | `jump_power` | 學生自己的變數，在 `on_jump_key` 裡使用，引擎不會直接讀它 | 沒有 |
+| `score_server` | 只有 `official.ipynb` 用：計分板那台電腦的 IP，例如 `'192.168.1.23'` | `''`（不自動登記） |
+| `match_code` | 只有 `official.ipynb` 用：計分板顯示的比賽代碼 | `''`（不自動登記） |
 
 ### 關卡元素
 
@@ -405,18 +409,53 @@ def on_shoot_key(game):
 
 ## 七、官方比賽
 
-1. 學生打開 `official.ipynb`，只改球員那一格（名字、球衣、背號），再從上到下執行。
-2. 官方版本的規則都已經寫好，而且內建二段跳和射門。關卡用固定的種子產生，每個人遇到的關卡完全一樣，分數才能互相比較。
-3. 遊戲結束畫面會用大字顯示「官方版本」、名字和分數。助教看到「官方版本」標籤，才能確定這不是學生自己改過的版本。
-4. 助教在 `teacher/scoreboard.html` 輸入名字和分數，按 Enter 加入。
+1. 學生打開 `official.ipynb`，只改球員那一格（名字、球衣、背號）和比賽登記那一格（`score_server`、`match_code`），再從上到下執行。
+2. 官方版本的規則都已經寫好，而且內建二段跳和射門。關卡用固定的種子產生，每個人遇到的關卡完全一樣，分數才能互相比較。只有 2 條命，速度會一直加快，後面還會出現「兩個三角錐」和「球鞋接三角錐」的組合，大約玩 1 到 3 分鐘會結束。
+3. 分數到 2000 分時，背景會換成順安國中，並顯示「歡迎來到順安國中！」。要換的照片放在 `soccer/assets/background_school.png`，門檻分數在 `soccer/config.py` 的 `school_background_score`。
+4. 遊戲結束畫面會用大字顯示「官方版本」、名字和分數。助教看到「官方版本」標籤，才能確定這不是學生自己改過的版本。
+5. 有開計分板伺服器的話，每玩完一局分數就會自動登記，結束畫面會多一行登記的結果；沒開的話，助教在計分板手動輸入名字和分數。
+
+### 自動登記
+
+1. 在要投影的老師電腦上執行：
+	```
+	python teacher/score_server.py
+	```
+	終端機會印出這台電腦的 IP 和比賽代碼。第一次執行時，Windows 會問要不要允許 Python 連線，請勾選「私人網路」並允許。
+2. 用這台電腦的瀏覽器打開 `http://localhost:8765`，按 F11 投影。最上面會用大字寫出學生要填的兩行，例如：
+	```
+	score_server = '192.168.1.23'
+	match_code = '4821'
+	```
+	電腦有好幾張網卡時會列出好幾個 IP，通常第一個就是對的；不確定的話，拿一台學生電腦逐一試試看。
+3. 學生照著抄進 `official.ipynb` 的比賽登記那一格。每玩完一局，結束畫面會顯示其中一種結果：
+
+| 結束畫面的訊息 | 意思 | 處理 |
+| --- | --- | --- |
+| 已登記到排行榜！ | 第一次登記成功 | 不用處理 |
+| 刷新紀錄！排行榜已更新 | 比之前的最高分高 | 不用處理 |
+| 沒有超過你的最高分…… | 有送到，但比之前低，排行榜不變 | 不用處理 |
+| 比賽代碼不對…… | `match_code` 抄錯，或計分板按過「全部清除」換了代碼 | 照計分板重新抄，重新執行那一格再玩 |
+| 關卡和官方版本不一樣…… | 學生的 `soccer/config.py` 和老師的不一樣（改過或拿到舊版） | 重新複製助教發的 `soccer` 資料夾 |
+| 分數不合理…… | 分數大到不可能玩出來 | 請助教確認 |
+| 連不到計分板…… | IP 抄錯、伺服器沒開、防火牆擋住，或不在同一個網路 | 先檢查 IP；全班都連不到時，改用手動登記 |
+
+上面沒有訊息，代表 `score_server` 和 `match_code` 沒有填，這一局不會自動登記。
+
+- 名單上的名字是「#背號 名字」，例如「#10 小明」，和結束畫面一樣。名字或背號改了，會變成另一筆。
+- 分數存在 `teacher/scores.json`，伺服器關掉再打開，名單和比賽代碼都還在。
+- 刪除、全部清除、手動輸入只有在老師那台電腦上打開的計分板才能用，學生的電腦只能送分數，也看不到比賽代碼。
+- 「全部清除」會順便換一組新的比賽代碼，上一場的學生就送不進來了。換一班上課時按一次。
+- 學生在 notebook 裡可以執行任何 Python，所以沒辦法完全防止有人故意送假分數。計分板只擋掉代碼不對、關卡不同、分數大得不合理這幾種情況；前幾名最好請助教看一下結束畫面確認。
 
 ### 計分板怎麼用
 
+- 有兩種打開方式：執行 `teacher/score_server.py` 後打開 `http://localhost:8765`，分數會自動登記、存在 `teacher/scores.json`；直接用瀏覽器打開 `teacher/scoreboard.html`，就只能手動輸入、資料存在瀏覽器裡。兩種都可以手動輸入。
 - 輸入名字和分數，按 Enter 或「加入」。分數打成 `1,230` 也可以。
 - 名單自動由高到低排序，前三名放大顯示。同分的人名次相同。
 - 同一個名字再登記一次時，只保留比較高的分數，畫面上會顯示「刷新紀錄」或「保留原本的分數」。
 - 輸入錯了，按那一列的「刪除」。
-- 資料存在這台電腦的瀏覽器裡，重新整理或關掉都不會消失。但換電腦或換瀏覽器就看不到，所以比賽結束記得按「下載 CSV」留存，下載的檔案可以用 Excel 打開。
+- 直接打開檔案時，資料存在這台電腦的瀏覽器裡，重新整理或關掉都不會消失。但換電腦或換瀏覽器就看不到，所以比賽結束記得按「下載 CSV」留存，下載的檔案可以用 Excel 打開。
 - 下一場比賽前按「全部清除」。
 - 投影時按 F11 全螢幕。
 
@@ -436,6 +475,8 @@ def on_shoot_key(game):
 | 中文變成方框 | 電腦沒有中文字型 | 在 `soccer/config.py` 的 `font_names` 加上電腦上有的中文字型名稱 |
 | 沒有聲音 | 喇叭沒開；`soccer/config.py` 的 `sound_enabled` 是 `False`；或 kernel 還在用更新前的舊程式 | 檢查喇叭和設定，再重新啟動 kernel；全班一起有聲音太吵時，可以把 `sound_enabled` 改成 `False` |
 | 改了 `soccer/config.py`，遊戲卻沒變 | kernel 還在用舊的程式 | 「Kernel」→「Restart Kernel」，再從頭執行 |
+| 計分板上方顯示「連不到計分板伺服器」 | 執行 `score_server.py` 的終端機被關掉了 | 重新執行 `python teacher/score_server.py`，名單會從 `teacher/scores.json` 讀回來 |
+| 執行 `score_server.py` 時說連接埠已經被占用 | 已經開了另一個計分板伺服器 | 找到原本的終端機繼續用，或關掉它再重新執行 |
 | 玩的時候頭暈 | 畫面捲動 | `soccer/config.py` 的 `grass_scrolls` 保持 `False`；可以把 `start_speed` 調低 |
 
 ## 九、修改教材
@@ -445,5 +486,7 @@ def on_shoot_key(game):
 - **改 notebook 內容**：只改 `teacher/solution.ipynb`，再執行 `python teacher/make_game_notebook.py` 重新產生 `game.ipynb`。不要直接改 `game.ipynb`，下次產生時會被蓋掉。
 - **改錯誤訊息的用語**：全部在 `soccer/checks.py`。改完記得同步更新本手冊的「錯誤訊息一覽」。
 - **換一套官方關卡**：改 `soccer/config.py` 的 `official_seed`。比賽進行中絕對不要改，否則前後的分數不能比較。
+- **調整官方模式的難度**：改 `soccer/config.py` 官方模式那一段（速度上限、命數、組合障礙），改完執行 `python teacher/test_official.py`，看電腦自動玩的平均秒數，並確認「完全沒有誤差」的那一局沒有撞到。改了難度也要順便改 `official_seed`，計分板才會擋掉舊版的檔案。
+- **換順安國中的照片或門檻分數**：照片放在 `soccer/assets/background_school.png`；門檻分數、交替的時間、歡迎的字都在 `soccer/config.py` 的 `school_background_score`、`school_fade_frames`、`school_banner_text`。
 - **換圖片和音效**：見 `soccer/assets/README.md`。
 - **交給學生之前**：執行 `python teacher/clear_outputs.py`，並確認沒有把 `teacher` 資料夾一起發下去。

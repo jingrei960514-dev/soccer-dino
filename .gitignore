@@ -6,3 +6,7 @@ __pycache__/
 
 # VS Code 的個人設定
 .vscode/
+
+# 計分板伺服器存的分數，每場比賽不一樣
+teacher/scores.json
+teacher/scores.json.tmp

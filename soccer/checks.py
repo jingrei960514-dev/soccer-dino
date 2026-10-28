@@ -109,6 +109,31 @@ def check_player_settings(student_globals):
 	return problems
 
 
+# 官方模式才有的計分板設定：score_server（老師電腦的 IP）和 match_code（比賽代碼）。
+# 兩個都可以不寫或留空，代表不自動登記；但只填了一個，一定是漏掉了另一個。
+def check_upload_settings(student_globals):
+	problems = []
+	server = student_globals.get('score_server', '')
+	code = student_globals.get('match_code', '')
+
+	if not isinstance(server, str):
+		problems.append('score_server 要是文字，前後加上引號，例如 score_server = \'192.168.1.23\'。你寫的是 ' + repr(server) + '。')
+	if not is_text_or_whole_number(code):
+		problems.append('match_code 要是文字，前後加上引號，例如 match_code = \'4821\'。你寫的是 ' + repr(code) + '。')
+	if len(problems) > 0:
+		return problems
+
+	server = server.strip()
+	code = str(code).strip()
+	if server.startswith('http'):
+		problems.append('score_server 只要寫 IP 就好，例如 \'192.168.1.23\'，前面不用加 http://。')
+	if server != '' and code == '':
+		problems.append('填了 score_server，也要填 match_code，照著計分板上顯示的比賽代碼抄。')
+	if server == '' and code != '':
+		problems.append('填了 match_code，也要填 score_server，照著計分板上顯示的 IP 抄。')
+	return problems
+
+
 # 檢查 course 清單：型別、長度，以及每一個名稱是不是引擎認得的。
 def check_course(student_globals):
 	if 'course' not in student_globals:
