@@ -1,7 +1,7 @@
 # 清除 notebook 的執行結果，交給學生之前執行一次。
 # 在專案資料夾的終端機輸入：
-#	python clear_outputs.py                 清除這個資料夾裡所有的 .ipynb
-#	python clear_outputs.py game.ipynb      只清除指定的 notebook
+#	python teacher/clear_outputs.py                 清除 teacher 資料夾和上一層（學生的）所有 .ipynb
+#	python teacher/clear_outputs.py game.ipynb      只清除指定的 notebook
 # 為什麼要清除：執行結果會存進 .ipynb 檔裡，學生打開就會看到上一個人的錯誤訊息或分數，
 # 而且每次執行過檔案內容都會改變，用 git 比較版本時會多出一堆不重要的差異。
 
@@ -40,12 +40,14 @@ def main():
 	if len(sys.argv) > 1:
 		paths = sys.argv[1:]
 	else:
-		# 沒有指定檔案時，找出這個腳本所在資料夾裡所有的 .ipynb
-		folder = os.path.dirname(os.path.abspath(__file__))
+		# 沒有指定檔案時，找出 teacher 資料夾（教師版）和上一層（學生的 notebook）裡所有的 .ipynb
+		teacher_folder = os.path.dirname(os.path.abspath(__file__))
+		student_folder = os.path.dirname(teacher_folder)
 		paths = []
-		for file_name in sorted(os.listdir(folder)):
-			if file_name.endswith('.ipynb'):
-				paths.append(os.path.join(folder, file_name))
+		for folder in [student_folder, teacher_folder]:
+			for file_name in sorted(os.listdir(folder)):
+				if file_name.endswith('.ipynb'):
+					paths.append(os.path.join(folder, file_name))
 
 	for path in paths:
 		if clear_notebook(path):

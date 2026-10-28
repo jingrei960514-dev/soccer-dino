@@ -6,17 +6,19 @@
 
 ## 檔案總覽
 
+專案分成三塊：最外層是學生要打開的 notebook；`soccer/` 是遊戲引擎，學生不用打開，但一定要跟著發下去；`teacher/` 是老師和助教用的，**不要發給學生**，裡面有參考答案。
+
 | 檔案 | 給誰 | 用途 |
 | --- | --- | --- |
 | `game.ipynb` | 學生 | 壞掉的版本，學生從這裡開始修 |
-| `solution.ipynb` | 老師 | 全部修好的版本，也是 `game.ipynb` 的來源 |
 | `official.ipynb` | 學生 | 官方比賽用，只能改球員設定 |
-| `scoreboard.html` | 助教 | 比賽計分板，用瀏覽器打開後投影 |
-| `engine.py`、`config.py`、`drawing.py`、`sound.py`、`checks.py` | 不用打開 | 遊戲引擎，必須和 notebook 放在同一個資料夾 |
-| `assets/` | 選用 | 放圖片和音效，說明在 `assets/README.md` |
-| `clear_outputs.py` | 老師 | 清除 notebook 的執行結果 |
-| `make_game_notebook.py` | 老師 | 修改 `solution.ipynb` 之後，重新產生 `game.ipynb` |
-| `run.py` | 開發用 | 不開 Jupyter，直接在終端機執行 notebook |
+| `soccer/engine.py`、`config.py`、`drawing.py`、`sound.py`、`checks.py` | 不用打開 | 遊戲引擎，`soccer` 資料夾必須和學生的 notebook 放在同一層 |
+| `soccer/assets/` | 選用 | 放圖片和音效，說明在 `soccer/assets/README.md` |
+| `teacher/solution.ipynb` | 老師 | 全部修好的版本，也是 `game.ipynb` 的來源 |
+| `teacher/scoreboard.html` | 助教 | 比賽計分板，用瀏覽器打開後投影 |
+| `teacher/clear_outputs.py` | 老師 | 清除 notebook 的執行結果 |
+| `teacher/make_game_notebook.py` | 老師 | 修改 `solution.ipynb` 之後，重新產生 `game.ipynb` |
+| `teacher/run.py` | 開發用 | 不開 Jupyter，直接在終端機執行 notebook |
 
 ## 一、課前準備
 
@@ -27,14 +29,14 @@
 	python -m pip install pygame jupyterlab
 	```
 	開發和測試時用的是 Python 3.10 和 pygame 2.6。程式刻意避開只有新版才有的功能，但其他版本沒有實際測過，現場的版本不同時，請務必照第 4 步試跑一次。
-2. **複製整個資料夾**：notebook 和所有 `.py` 檔要放在同一個資料夾，`import engine` 才找得到。
+2. **複製資料夾**：把 `game.ipynb`、`official.ipynb` 和整個 `soccer` 資料夾放在同一個資料夾裡，`from soccer import engine` 才找得到。`teacher` 資料夾不要複製到學生的電腦。
 3. **把 Jupyter 設定成用 tab 縮排**：做法見下一節。
 4. **試跑一次**：打開 `game.ipynb`，從上到下按 `Shift + Enter` 執行，確認遊戲視窗會跳出來，而且有聲音。
 5. **清除執行結果**：試跑之後 notebook 會存下執行結果，交給學生前執行一次：
 	```
-	python clear_outputs.py
+	python teacher/clear_outputs.py
 	```
-6. **計分板**：用要投影的那台電腦打開 `scoreboard.html`，確認字夠大。
+6. **計分板**：用要投影的那台電腦打開 `teacher/scoreboard.html`，確認字夠大。
 
 如果一台電腦上有好幾個 Python，Jupyter 可能用到沒裝 pygame 的那一個。遊戲會顯示「這台電腦的 Python 沒有安裝 pygame」，並列出這個 kernel 用的是哪個 Python，照訊息裡的指令安裝，或在 Jupyter 右上角換 kernel 即可。
 
@@ -232,7 +234,7 @@ def on_tick(game):
 
 ### 想調整難度的話
 
-挖空的內容寫在 `make_game_notebook.py` 的 `jump_cell`、`hit_cell`、`tick_cell`。改完執行 `python make_game_notebook.py`，`game.ipynb` 就會重新產生。
+挖空的內容寫在 `teacher/make_game_notebook.py` 的 `jump_cell`、`hit_cell`、`tick_cell`。改完執行 `python teacher/make_game_notebook.py`，`game.ipynb` 就會重新產生。
 
 - 空格只能放在「一段程式」的位置，例如 `game.lives = ______` 或 `game.______()`。
 - 不能把運算子挖掉，例如 `game.lives ______ 1`。這在填之前就是語法錯誤，整格都不能執行。
@@ -309,7 +311,7 @@ def on_shoot_key(game):
 
 ## 六、錯誤訊息一覽
 
-學生看到的錯誤訊息都在 `checks.py` 和 `engine.py`。訊息分成三種時間點，下面依序列出每一則訊息、原因和處理方法。訊息裡用 `……` 表示會依學生寫的內容替換的部分。
+學生看到的錯誤訊息都在 `soccer/checks.py` 和 `soccer/engine.py`。訊息分成三種時間點，下面依序列出每一則訊息、原因和處理方法。訊息裡用 `……` 表示會依學生寫的內容替換的部分。
 
 ### 開始前的檢查：遊戲視窗不會打開
 
@@ -406,7 +408,7 @@ def on_shoot_key(game):
 1. 學生打開 `official.ipynb`，只改球員那一格（名字、球衣、背號），再從上到下執行。
 2. 官方版本的規則都已經寫好，而且內建二段跳和射門。關卡用固定的種子產生，每個人遇到的關卡完全一樣，分數才能互相比較。
 3. 遊戲結束畫面會用大字顯示「官方版本」、名字和分數。助教看到「官方版本」標籤，才能確定這不是學生自己改過的版本。
-4. 助教在 `scoreboard.html` 輸入名字和分數，按 Enter 加入。
+4. 助教在 `teacher/scoreboard.html` 輸入名字和分數，按 Enter 加入。
 
 ### 計分板怎麼用
 
@@ -431,17 +433,17 @@ def on_shoot_key(game):
 | 刪掉一個函式，遊戲還是照用 | Jupyter 會記住執行過的東西 | 「Kernel」→「Restart Kernel」，再從頭執行 |
 | 最後一格一直顯示 `[*]`，不會結束 | 遊戲視窗還開著（可能躲在後面），或程式卡在無窮迴圈 | 找到遊戲視窗按 Esc；找不到就按 Jupyter 的中斷鍵 |
 | 按「Run All」跑不起來 | notebook 選到了沒有 pygame 的 kernel | 在右上角換成已安裝 pygame 的 Python |
-| 中文變成方框 | 電腦沒有中文字型 | 在 `config.py` 的 `font_names` 加上電腦上有的中文字型名稱 |
-| 沒有聲音 | 喇叭沒開；`config.py` 的 `sound_enabled` 是 `False`；或 kernel 還在用更新前的舊程式 | 檢查喇叭和設定，再重新啟動 kernel；全班一起有聲音太吵時，可以把 `sound_enabled` 改成 `False` |
-| 改了 `config.py`，遊戲卻沒變 | kernel 還在用舊的程式 | 「Kernel」→「Restart Kernel」，再從頭執行 |
-| 玩的時候頭暈 | 畫面捲動 | `config.py` 的 `grass_scrolls` 保持 `False`；可以把 `start_speed` 調低 |
+| 中文變成方框 | 電腦沒有中文字型 | 在 `soccer/config.py` 的 `font_names` 加上電腦上有的中文字型名稱 |
+| 沒有聲音 | 喇叭沒開；`soccer/config.py` 的 `sound_enabled` 是 `False`；或 kernel 還在用更新前的舊程式 | 檢查喇叭和設定，再重新啟動 kernel；全班一起有聲音太吵時，可以把 `sound_enabled` 改成 `False` |
+| 改了 `soccer/config.py`，遊戲卻沒變 | kernel 還在用舊的程式 | 「Kernel」→「Restart Kernel」，再從頭執行 |
+| 玩的時候頭暈 | 畫面捲動 | `soccer/config.py` 的 `grass_scrolls` 保持 `False`；可以把 `start_speed` 調低 |
 
 ## 九、修改教材
 
-- **改遊戲手感**（重力、速度、障礙物大小、顏色）：只改 `config.py`，每個數值都有說明。
-- **改了任何 `.py` 檔之後，要重新啟動 kernel**（「Kernel」→「Restart Kernel」，VS Code 是上方的「Restart」）。`import engine` 在同一個 kernel 裡只會真正載入一次，之後再執行也不會重新讀檔，所以沒重啟的話，遊戲還是用舊的程式。上課中途改了 `config.py`，也要請學生重啟。
-- **改 notebook 內容**：只改 `solution.ipynb`，再執行 `python make_game_notebook.py` 重新產生 `game.ipynb`。不要直接改 `game.ipynb`，下次產生時會被蓋掉。
-- **改錯誤訊息的用語**：全部在 `checks.py`。改完記得同步更新本手冊的「錯誤訊息一覽」。
-- **換一套官方關卡**：改 `config.py` 的 `official_seed`。比賽進行中絕對不要改，否則前後的分數不能比較。
-- **換圖片和音效**：見 `assets/README.md`。
-- **交給學生之前**：執行 `python clear_outputs.py`。
+- **改遊戲手感**（重力、速度、障礙物大小、顏色）：只改 `soccer/config.py`，每個數值都有說明。
+- **改了任何 `.py` 檔之後，要重新啟動 kernel**（「Kernel」→「Restart Kernel」，VS Code 是上方的「Restart」）。`from soccer import engine` 在同一個 kernel 裡只會真正載入一次，之後再執行也不會重新讀檔，所以沒重啟的話，遊戲還是用舊的程式。上課中途改了 `soccer/config.py`，也要請學生重啟。
+- **改 notebook 內容**：只改 `teacher/solution.ipynb`，再執行 `python teacher/make_game_notebook.py` 重新產生 `game.ipynb`。不要直接改 `game.ipynb`，下次產生時會被蓋掉。
+- **改錯誤訊息的用語**：全部在 `soccer/checks.py`。改完記得同步更新本手冊的「錯誤訊息一覽」。
+- **換一套官方關卡**：改 `soccer/config.py` 的 `official_seed`。比賽進行中絕對不要改，否則前後的分數不能比較。
+- **換圖片和音效**：見 `soccer/assets/README.md`。
+- **交給學生之前**：執行 `python teacher/clear_outputs.py`，並確認沒有把 `teacher` 資料夾一起發下去。

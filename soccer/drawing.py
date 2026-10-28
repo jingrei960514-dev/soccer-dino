@@ -7,7 +7,7 @@ import os
 
 import pygame
 
-import config
+from soccer import config
 
 
 # ===== 字型與文字 =====

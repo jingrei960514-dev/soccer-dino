@@ -19,31 +19,37 @@
 
 ## 檔案用途
 
+檔案分成三塊，路徑都以專案最外層為準：
+
+- **最外層**：學生要打開的 `game.ipynb`、`official.ipynb`。
+- **`soccer/`**：遊戲引擎，是一個 Python 套件（有 `__init__.py`）。學生的 notebook 和它放在同一層，用 `from soccer import engine` 載入；引擎裡的檔案彼此也用 `from soccer import config` 這種寫法互相載入。
+- **`teacher/`**：教師版、文件、工具，不發給學生。`solution.ipynb` 在這個資料夾裡執行，第一格先用 `sys.path.insert(0, '..')` 把上一層加進 Python 找檔案的地方，才找得到 `soccer`。
+
 | 檔案 | 用途 |
 | --- | --- |
-| `config.py` | 所有可以調整的數值：視窗大小、重力、速度上下限、障礙物大小、顏色、按鍵。想改手感只改這裡。 |
-| `engine.py` | 遊戲規則與狀態：`Game` 類別、讀取學生設定、主迴圈、跳躍物理、碰撞、過關判斷。 |
-| `checks.py` | 防呆：遊戲開始前檢查學生的設定，遊戲中把學生函式的錯誤翻譯成中文說明。所有給學生看的錯誤訊息都在這裡。 |
-| `drawing.py` | 所有畫圖的程式。每種角色一個 `draw_` 函式，先找 `assets/` 裡的圖檔，找不到才用幾何圖形。 |
-| `sound.py` | 音效：載入 `assets/` 裡的音效檔，找不到就用程式產生嗶聲；沒有喇叭時自動靜音。 |
-| `assets/` | 放圖片和音效的資料夾，檔名與大小寫在裡面的 `README.md`。空的也能玩。 |
-| `run.py` | 開發用的入口，讀出 notebook 裡的程式格直接執行，不用開 Jupyter。`python run.py` 執行 solution.ipynb，`python run.py game.ipynb` 執行其他 notebook。 |
-| `solution.ipynb` | 教師版 notebook，全部問題都已修好。也是破壞版的來源。 |
+| `soccer/config.py` | 所有可以調整的數值：視窗大小、重力、速度上下限、障礙物大小、顏色、按鍵。想改手感只改這裡。 |
+| `soccer/engine.py` | 遊戲規則與狀態：`Game` 類別、讀取學生設定、主迴圈、跳躍物理、碰撞、過關判斷。 |
+| `soccer/checks.py` | 防呆：遊戲開始前檢查學生的設定，遊戲中把學生函式的錯誤翻譯成中文說明。所有給學生看的錯誤訊息都在這裡。 |
+| `soccer/drawing.py` | 所有畫圖的程式。每種角色一個 `draw_` 函式，先找 `assets/` 裡的圖檔，找不到才用幾何圖形。 |
+| `soccer/sound.py` | 音效：載入 `assets/` 裡的音效檔，找不到就用程式產生嗶聲；沒有喇叭時自動靜音。 |
+| `soccer/assets/` | 放圖片和音效的資料夾，檔名與大小寫在裡面的 `README.md`。空的也能玩。 |
+| `teacher/run.py` | 開發用的入口，讀出 notebook 裡的程式格直接執行，不用開 Jupyter。`python teacher/run.py` 執行 solution.ipynb，`python teacher/run.py game.ipynb` 執行其他 notebook。 |
+| `teacher/solution.ipynb` | 教師版 notebook，全部問題都已修好。也是破壞版的來源。 |
 | `game.ipynb` | 學生拿到的破壞版，由 `make_game_notebook.py` 產生，**不要直接修改**。 |
 | `official.ipynb` | 官方比賽用的 notebook，只設定球員，最後一格呼叫 `engine.run_official(globals())`。 |
-| `make_game_notebook.py` | 從 solution.ipynb 產生 game.ipynb：找出特定的格子換成破壞版內容，並清除執行結果。 |
-| `clear_outputs.py` | 清除 notebook 的執行結果，交給學生之前執行。 |
-| `scoreboard.html` | 官方比賽的計分板，單一檔案、不需網路，用瀏覽器打開後投影。 |
-| `TEACHER_GUIDE.md` | 教師手冊：課前準備、參考答案、提示卡、所有錯誤訊息、常見問題。 |
+| `teacher/make_game_notebook.py` | 從 solution.ipynb 產生 game.ipynb：找出特定的格子換成破壞版內容，並清除執行結果。 |
+| `teacher/clear_outputs.py` | 清除 notebook 的執行結果，交給學生之前執行。沒有指定檔案時，會清除最外層和 `teacher/` 裡所有的 notebook。 |
+| `teacher/scoreboard.html` | 官方比賽的計分板，單一檔案、不需網路，用瀏覽器打開後投影。 |
+| `teacher/TEACHER_GUIDE.md` | 教師手冊：課前準備、參考答案、提示卡、所有錯誤訊息、常見問題。 |
 
 ## notebook 怎麼被執行
 
-學生的 notebook 依序是：`import engine` → 球員設定 → 關卡 → 三個規則函式（各一格）→ `engine.run(globals())`。每個要修的函式各自一格，上課時可以一格一格修。
+學生的 notebook 依序是：`from soccer import engine` → 球員設定 → 關卡 → 三個規則函式（各一格）→ `engine.run(globals())`。每個要修的函式各自一格，上課時可以一格一格修。
 
 有兩種執行方式，結果完全相同：
 
 - **Jupyter**：學生一格一格執行，最後一格把 notebook 的 `globals()` 交給引擎。
-- **`run.py`**：把 notebook 的所有程式格接成一段程式碼，用 `exec` 放在一個空字典裡執行。這個字典就是那段程式的 `globals()`，所以最後一行 `engine.run(globals())` 一樣能拿到所有變數和函式。
+- **`run.py`**：把 notebook 的所有程式格接成一段程式碼，用 `exec` 放在一個空字典裡執行。這個字典就是那段程式的 `globals()`，所以最後一行 `engine.run(globals())` 一樣能拿到所有變數和函式。執行前會先切換到 notebook 所在的資料夾，並把它加進 Python 找檔案的地方，和 Jupyter 的做法一樣，所以 `from soccer import engine` 和 `sys.path.insert(0, '..')` 在兩邊效果相同。
 
 Jupyter 有一個要注意的地方：kernel 會記住所有執行過的東西。學生如果刪掉某個函式的格子，舊的函式還留在 kernel 裡，遊戲照樣會用它；要真正清掉必須「重新啟動 kernel」。
 
@@ -54,6 +60,7 @@ Jupyter 有一個要注意的地方：kernel 會記住所有執行過的東西�
 | 找的文字 | 換成 |
 | --- | --- |
 | `教師版` | 學生版的開頭說明，告訴學生有【問題一】到【問題四】 |
+| `from soccer import engine` | 只有 `from soccer import engine` 一行的載入格（學生版和 `soccer` 放在同一層，不用改搜尋路徑） |
 | `# ===== 我的關卡 =====` | 【問題一】全部都是 `'cone'` 的清單 |
 | `def on_jump_key` | 【問題二】挖空版：`if game.______:`、`game.vy = ______` |
 | `def on_hit` | 【問題三】挖空版：命、結束條件、`game.______()` 三個空格 |
@@ -68,7 +75,7 @@ Jupyter 有一個要注意的地方：kernel 會記住所有執行過的東西�
 
 所以 `read_student_settings()` 會用 `checks.has_blank()` 檢查每個規則函式：函式的 `__code__.co_names` 是它用到的所有名稱（包括 `game.______` 這種屬性名稱），裡面有全部是底線的名字，就代表還有空格沒填，這個函式就記成 `None`，和沒寫一樣。遊戲開始前，`checks.find_blank_functions()` 會在「【提醒】」裡列出還沒填完的函式。
 
-只要有一項找不到，腳本就不會寫檔，避免產生一份「少壞一項」的破壞版卻沒人發現。修改教材的流程：改 solution.ipynb → 執行 `python make_game_notebook.py`。
+只要有一項找不到，腳本就不會寫檔，避免產生一份「少壞一項」的破壞版卻沒人發現。修改教材的流程：改 solution.ipynb → 執行 `python teacher/make_game_notebook.py`。
 
 ## `game` 物件有哪些屬性
 
@@ -250,7 +257,7 @@ engine.run(globals())               engine.run_official(globals())
 
 ### Jupyter 的穩定性
 
-- 找不到 pygame 時，`import engine` 不會出錯，執行最後一格時才印出中文說明，並告訴助教這個 kernel 用的是哪個 Python。
+- 找不到 pygame 時，`from soccer import engine` 不會出錯，執行最後一格時才印出中文說明，並告訴助教這個 kernel 用的是哪個 Python。
 - 在 Jupyter 按「中斷」時，接住 `KeyboardInterrupt`，關掉視窗並印出一句說明，不顯示 traceback。
 - 不管怎麼結束（正常、出錯、中斷），`pygame.quit()` 都在 `finally` 裡，同一個 kernel 可以馬上再執行一次。
 

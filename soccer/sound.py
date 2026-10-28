@@ -8,7 +8,7 @@ import os
 
 import pygame
 
-import config
+from soccer import config
 
 
 # 必須在 pygame.init() 之前呼叫，設定混音器的格式。

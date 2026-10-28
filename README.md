@@ -52,9 +52,9 @@ python -m pip install pygame jupyterlab
 **用終端機（開發測試用）**：
 
 ```
-python run.py                    執行 solution.ipynb（全部修好的版本）
-python run.py game.ipynb         執行壞掉的版本
-python run.py official.ipynb     執行官方比賽版本
+python teacher/run.py                    執行 solution.ipynb（全部修好的版本）
+python teacher/run.py game.ipynb         執行壞掉的版本
+python teacher/run.py official.ipynb     執行官方比賽版本
 ```
 
 ## 操作方式
@@ -68,46 +68,55 @@ python run.py official.ipynb     執行官方比賽版本
 
 ## 檔案
 
+```
+Soccer/
+├─ game.ipynb, official.ipynb   學生打開的 notebook
+├─ soccer/                      遊戲引擎：學生不用打開，但要跟著發下去
+└─ teacher/                     教師版、文件、工具：不要發給學生
+```
+
+發給學生時，只給最外層的兩個 notebook 和 `soccer` 資料夾。
+
 | 檔案 | 用途 |
 | --- | --- |
-| `game.ipynb` | 學生拿到的壞掉版本，由 `make_game_notebook.py` 產生 |
-| `solution.ipynb` | 全部修好的教師版 |
+| `game.ipynb` | 學生拿到的壞掉版本，由 `teacher/make_game_notebook.py` 產生 |
 | `official.ipynb` | 官方比賽用，只能改球員設定 |
-| `scoreboard.html` | 比賽計分板，單一檔案、不需網路，用瀏覽器打開後投影 |
-| `engine.py` | 遊戲規則與主迴圈 |
-| `config.py` | 所有可以調整的數值：速度、重力、大小、顏色、按鍵 |
-| `drawing.py` | 畫面 |
-| `sound.py` | 音效 |
-| `checks.py` | 防呆檢查與中文錯誤訊息 |
-| `assets/` | 選用的圖片和音效，說明在 `assets/README.md` |
-| `run.py` | 不開 Jupyter，直接執行 notebook |
-| `make_game_notebook.py` | 從 `solution.ipynb` 產生 `game.ipynb` |
-| `clear_outputs.py` | 清除 notebook 的執行結果 |
-| `TEACHER_GUIDE.md` | 教師手冊 |
-| `ARCHITECTURE.md` | 程式架構說明 |
+| `soccer/engine.py` | 遊戲規則與主迴圈 |
+| `soccer/config.py` | 所有可以調整的數值：速度、重力、大小、顏色、按鍵 |
+| `soccer/drawing.py` | 畫面 |
+| `soccer/sound.py` | 音效 |
+| `soccer/checks.py` | 防呆檢查與中文錯誤訊息 |
+| `soccer/assets/` | 選用的圖片和音效，說明在 `soccer/assets/README.md` |
+| `teacher/solution.ipynb` | 全部修好的教師版 |
+| `teacher/scoreboard.html` | 比賽計分板，單一檔案、不需網路，用瀏覽器打開後投影 |
+| `teacher/run.py` | 不開 Jupyter，直接執行 notebook |
+| `teacher/make_game_notebook.py` | 從 `solution.ipynb` 產生 `game.ipynb` |
+| `teacher/clear_outputs.py` | 清除 notebook 的執行結果 |
+| `teacher/TEACHER_GUIDE.md` | 教師手冊 |
+| `teacher/ARCHITECTURE.md` | 程式架構說明 |
 
 ## 文件
 
-- **上課的老師和助教**：請看 [`TEACHER_GUIDE.md`](TEACHER_GUIDE.md)。內容有課前準備、Jupyter 設定、參考答案、挑戰題提示卡、所有錯誤訊息的原因，以及常見問題。
-- **要修改程式的人**：請看 [`ARCHITECTURE.md`](ARCHITECTURE.md)。內容有整體架構、每一幀的流程、每個檔案負責什麼。
+- **上課的老師和助教**：請看 [`teacher/TEACHER_GUIDE.md`](teacher/TEACHER_GUIDE.md)。內容有課前準備、Jupyter 設定、參考答案、挑戰題提示卡、所有錯誤訊息的原因，以及常見問題。
+- **要修改程式的人**：請看 [`teacher/ARCHITECTURE.md`](teacher/ARCHITECTURE.md)。內容有整體架構、每一幀的流程、每個檔案負責什麼。
 
 ## 特色
 
 - **防呆**：遊戲開始前會檢查學生的設定，打錯字時提示最像的正確名稱。學生的函式出錯時，會先關掉視窗，再用繁體中文說明哪個函式、哪一行出錯，以及可能的原因。
 - **官方模式**：無盡關卡、持續加速。關卡用固定的亂數種子產生，每個人遇到的完全一樣，分數才能互相比較。
 - **可以重複執行**：在同一個 Jupyter kernel 裡重複執行、中途出錯、按中斷，都能馬上再玩一次。
-- **換素材不用改程式**：把圖檔或音效檔放進 `assets/` 就會自動使用，沒放也能玩。
+- **換素材不用改程式**：把圖檔或音效檔放進 `soccer/assets/` 就會自動使用，沒放也能玩。
 - **減少頭暈**：背景和看台不捲動，只有腳下的小草跟著動。
 
 ## 修改教材
 
 | 想做的事 | 做法 |
 | --- | --- |
-| 改遊戲手感 | 只改 `config.py` |
-| 改 notebook 內容 | 改 `solution.ipynb`，再執行 `python make_game_notebook.py` 重新產生 `game.ipynb` |
-| 改錯誤訊息的用語 | 改 `checks.py`，並同步更新 `TEACHER_GUIDE.md` |
-| 換一套官方關卡 | 改 `config.py` 的 `official_seed` |
-| 交給學生之前 | 執行 `python clear_outputs.py` |
+| 改遊戲手感 | 只改 `soccer/config.py` |
+| 改 notebook 內容 | 改 `teacher/solution.ipynb`，再執行 `python teacher/make_game_notebook.py` 重新產生 `game.ipynb` |
+| 改錯誤訊息的用語 | 改 `soccer/checks.py`，並同步更新 `teacher/TEACHER_GUIDE.md` |
+| 換一套官方關卡 | 改 `soccer/config.py` 的 `official_seed` |
+| 交給學生之前 | 執行 `python teacher/clear_outputs.py` |
 
 ## 程式碼規範
 
@@ -122,4 +131,4 @@ python run.py official.ipynb     執行官方比賽版本
 
 ## 素材與版權
 
-遊戲裡的人物、球場、聲音都是程式即時畫出、產生的，沒有使用任何外部素材，也沒有出現真實人物。在 `assets/` 加入素材時，只能用自己製作或授權允許自由使用的檔案。
+遊戲裡的人物、球場、聲音都是程式即時畫出、產生的，沒有使用任何外部素材，也沒有出現真實人物。在 `soccer/assets/` 加入素材時，只能用自己製作或授權允許自由使用的檔案。

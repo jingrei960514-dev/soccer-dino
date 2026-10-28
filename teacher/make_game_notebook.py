@@ -1,14 +1,18 @@
 # 從 solution.ipynb（教師版）產生 game.ipynb（學生拿到的破壞版）。
-# 修改教材時只改 solution.ipynb，再執行 python make_game_notebook.py，兩份就不會不一致。
+# 修改教材時只改 solution.ipynb，再執行 python teacher/make_game_notebook.py，兩份就不會不一致。
 # 做法：在 solution.ipynb 裡找出含有特定文字的格子，把整格換成下面寫好的破壞版內容，
 # 其他格子（說明、球員設定、開始遊戲）原封不動。
 # 教師版裡有答案的格子都要列在 replacements 裡，否則答案會原封不動帶到破壞版。
 
 import json
+import os
 
 
-source_path = 'solution.ipynb'
-output_path = 'game.ipynb'
+# 教師版和這個腳本一起放在 teacher 資料夾，產生的破壞版放在上一層，和學生的其他檔案在一起。
+# 路徑從這個腳本的位置算，所以不管在哪個資料夾執行都找得到。
+teacher_folder = os.path.dirname(os.path.abspath(__file__))
+source_path = os.path.join(teacher_folder, 'solution.ipynb')
+output_path = os.path.join(teacher_folder, '..', 'game.ipynb')
 
 
 # ===== 破壞版的內容 =====
@@ -80,6 +84,13 @@ def on_tick(game):
 	game.speed = ______
 '''
 
+# 教師版在 teacher 資料夾裡，要先把上一層加進搜尋路徑才找得到引擎；
+# 學生的 notebook 和 soccer 資料夾放在一起，只要一行，所以整格換掉
+import_cell = '''
+# 載入遊戲引擎（這一格不用改）
+from soccer import engine
+'''
+
 # 挑戰題不挖空，直接換成空的格子，教師版裡的答案才不會跟著帶到破壞版。
 # 挑戰一（二段跳）改的是 on_jump_key，已經被上面的 jump_cell 換掉了，不用另外處理
 shoot_cell = '''
@@ -91,6 +102,7 @@ shoot_cell = '''
 # 要找的文字必須只出現在那一格裡，否則會換錯格子。
 replacements = [
 	['教師版', title_cell],
+	['from soccer import engine', import_cell],
 	['# ===== 我的關卡 =====', course_cell],
 	['def on_jump_key', jump_cell],
 	['def on_hit', hit_cell],
@@ -141,7 +153,7 @@ def main():
 	with open(output_path, 'w', encoding='utf-8', newline='\n') as notebook_file:
 		json.dump(notebook, notebook_file, ensure_ascii=False, indent=1)
 		notebook_file.write('\n')
-	print('已產生 ' + output_path)
+	print('已產生 game.ipynb')
 
 
 main()

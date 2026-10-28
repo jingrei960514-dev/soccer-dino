@@ -21,8 +21,8 @@
 - 不管原圖多大都會縮放成上面的大小，所以寬高比例要接近，不然會被拉扁。障礙物的碰撞判定就是這個大小，所以圖的主體最好畫滿整張圖。球員例外：碰撞框只有中間 40 像素寬，兩側留給手臂。
 - 用 `player.png` 時，學生選的球衣顏色和背號不會顯示，因為球員的樣子都畫在圖裡了。名字仍然會顯示在頭上。
 - 背景圖只會畫在草地上方，草地和邊線還是用程式畫，所以任何照片都可以用，球員一定踩在草地上。照片會等比例縮放到蓋滿 960 x 210，左右置中、對齊底部，切掉的通常是上面的天空；不會被拉扁。
-- 背景照片會稍微調暗，角色和分數才看得清楚。想調整的話，改 `config.py` 的 `background_dim`（0 是不變暗）。背景不會捲動，因為整片背景一起滑動很容易頭暈。
-- 大小、檔名都可以在 `config.py` 的 `image_files`、`image_sizes` 修改。
+- 背景照片會稍微調暗，角色和分數才看得清楚。想調整的話，改 `soccer/config.py` 的 `background_dim`（0 是不變暗）。背景不會捲動，因為整片背景一起滑動很容易頭暈。
+- 大小、檔名都可以在 `soccer/config.py` 的 `image_files`、`image_sizes` 修改。
 
 ## 音效
 
@@ -36,8 +36,8 @@
 | `win.wav` | 抵達球門 |
 | `lose.wav` | 遊戲結束 |
 
-- 想用 .ogg 檔的話，在 `config.py` 的 `sound_files` 把檔名改成 .ogg。
-- 音量在 `config.py` 的 `sound_volume` 調整；想全部關掉，把 `sound_enabled` 改成 `False`。
+- 想用 .ogg 檔的話，在 `soccer/config.py` 的 `sound_files` 把檔名改成 .ogg。
+- 音量在 `soccer/config.py` 的 `sound_volume` 調整；想全部關掉，把 `sound_enabled` 改成 `False`。
 - 電腦沒有喇叭或音效卡時會自動靜音，遊戲照常玩。
 
 ## 版權

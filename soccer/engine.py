@@ -21,10 +21,10 @@ except ImportError:
 
 # config.py、drawing.py、sound.py、checks.py 都會用到 pygame，所以確定有 pygame 才載入它們
 if pygame_ready:
-	import config
-	import drawing
-	import sound
-	import checks
+	from soccer import config
+	from soccer import drawing
+	from soccer import sound
+	from soccer import checks
 
 
 # 學生函式裡收到的 game 就是這個類別的物件。

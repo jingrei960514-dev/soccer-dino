@@ -6,7 +6,7 @@
 import difflib
 import traceback
 
-import config
+from soccer import config
 
 
 # 學生的函式在遊戲中出錯時，引擎會丟出這種錯誤。

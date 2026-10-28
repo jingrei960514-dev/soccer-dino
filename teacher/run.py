@@ -1,11 +1,12 @@
 # 開發用的入口：不用開 Jupyter，直接執行 notebook 裡的程式。
 # 在專案資料夾的終端機輸入：
-#	python run.py                執行 solution.ipynb（教師版）
-#	python run.py game.ipynb     執行其他 notebook，例如破壞版
+#	python teacher/run.py                   執行 solution.ipynb（教師版）
+#	python teacher/run.py game.ipynb        執行其他 notebook，例如破壞版
 # notebook 是唯一的版本，這裡不再抄一份程式，才不會兩邊改了一邊、忘了另一邊。
 
 import json
 import linecache
+import os
 import sys
 
 
@@ -29,11 +30,17 @@ def read_notebook_code(path):
 
 def main():
 	if len(sys.argv) > 1:
-		path = sys.argv[1]
+		path = os.path.abspath(sys.argv[1])
 	else:
-		path = 'solution.ipynb'
+		path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'solution.ipynb')
 
 	code = read_notebook_code(path)
+	# Jupyter 執行 notebook 時，目前資料夾就是 notebook 所在的資料夾，而且 Python 會從這個資料夾找 import 的檔案。
+	# 這裡照做一次，notebook 裡的 from soccer import engine 和 sys.path.insert(0, '..') 才會和在 Jupyter 裡一樣有效
+	notebook_folder = os.path.dirname(path)
+	os.chdir(notebook_folder)
+	sys.path.insert(0, notebook_folder)
+	path = os.path.basename(path)
 	# 學生的函式出錯時，checks.py 會顯示「出錯的那一行」，Python 是用檔名去 linecache 查那一行的內容。
 	# 這段程式碼不是真的檔案（直接打開 .ipynb 會讀到 JSON），所以用一個特別的名字，
 	# 並把程式碼先放進 linecache，查的時候才拿得到正確的那一行。Jupyter 自己也是這樣做的
