@@ -149,6 +149,16 @@ def find_addresses():
 	return addresses
 
 
+# 老師電腦換了網路（例如從教室 Wi-Fi 換成熱點），之前確認過的 IP 就不見了。
+# 這時清掉它，計分板改回列出現在所有的 IP，等下一台學生電腦連進來再重新確認
+def check_confirmed_address(addresses):
+	global confirmed_address
+	if confirmed_address != '' and confirmed_address not in addresses:
+		print('這台電腦已經沒有 ' + confirmed_address + ' 這個 IP（可能換了網路），請學生改填新的 IP 再測試一次。')
+		confirmed_address = ''
+	return confirmed_address
+
+
 # ===== 處理連線 =====
 
 class ScoreHandler(http.server.BaseHTTPRequestHandler):
@@ -210,7 +220,7 @@ class ScoreHandler(http.server.BaseHTTPRequestHandler):
 			if self.is_local():
 				reply['code'] = data['code']
 				reply['addresses'] = find_addresses()
-				reply['confirmed_address'] = confirmed_address
+				reply['confirmed_address'] = check_confirmed_address(reply['addresses'])
 				reply['connected'] = connected_names
 			self.send_json(200, reply)
 		else:
