@@ -1,7 +1,8 @@
 # 官方比賽的計分板伺服器。在要投影的老師電腦上執行：
 #	python teacher/score_server.py
 # 執行後用這台電腦的瀏覽器打開 http://localhost:8765 就是計分板。
-# 學生在 official.ipynb 填上這台電腦的 IP 和比賽代碼，每玩完一局，分數就會自動送過來，每個人只保留最高分。
+# 學生在 official.ipynb 填上這台電腦的 IP 和比賽代碼，先執行「測試連線」，計分板上會出現已連線的名單；
+# 之後每玩完一局，分數就會自動送過來，每個人只保留最高分。
 # 只用 Python 內建的模組，不用另外安裝套件；按 Ctrl + C 關閉。
 #
 # 安全上的取捨：學生在 notebook 裡可以執行任何 Python，所以沒辦法完全防止送假分數。
@@ -56,6 +57,12 @@ def save_data():
 data = load_data()
 save_data()
 
+# 學生實際連進來的是這台電腦的哪個 IP。電腦有好幾張網卡時，猜不準學生連得到哪一個，
+# 所以等第一台學生電腦連進來，就用它連到的那個 IP，計分板只顯示這一個。空字串代表還沒有人連進來
+confirmed_address = ''
+# 已經測試連線成功（或已經送過分數）的名字，依照連進來的順序；只放在記憶體裡，伺服器重開就重新累積
+connected_names = []
+
 
 # ===== 分數的規則 =====
 
@@ -84,8 +91,16 @@ def add_score(name, score):
 	return {'result': result, 'best': best}
 
 
-# 檢查學生的遊戲送過來的資料，有問題回傳要給學生看的中文說明，沒問題回傳空字串
-def check_submission(body):
+# 把名字加進「已連線」名單；同一個人只記一次
+def add_connected(name):
+	if name not in connected_names:
+		connected_names.append(name)
+		print(name + '　已連線')
+
+
+# 檢查學生的名字、比賽代碼和關卡種子。測試連線和送分數都要檢查這幾項。
+# 有問題回傳要給學生看的中文說明，沒問題回傳空字串
+def check_player(body):
 	if not isinstance(body, dict):
 		return '送過來的資料格式不對，請助教手動登記。'
 	if str(body.get('code', '')) != data['code']:
@@ -95,6 +110,14 @@ def check_submission(body):
 	name = body.get('name')
 	if not isinstance(name, str) or name.strip() == '' or len(name) > max_label_length:
 		return '名字的格式不對，請助教手動登記。'
+	return ''
+
+
+# 檢查學生的遊戲送過來的分數，有問題回傳要給學生看的中文說明，沒問題回傳空字串
+def check_submission(body):
+	problem = check_player(body)
+	if problem != '':
+		return problem
 	score = body.get('score')
 	# bool 在 Python 裡也算整數，要排除
 	if isinstance(score, bool) or not isinstance(score, int) or score < 0 or score > config.max_official_score:
@@ -136,6 +159,17 @@ class ScoreHandler(http.server.BaseHTTPRequestHandler):
 	def is_local(self):
 		return self.client_address[0] in ['127.0.0.1', '::1']
 
+	# 別台電腦連進來時，記下它連到的是這台電腦的哪個 IP；那個 IP 一定是學生連得到的。
+	# 就算比賽代碼抄錯也算，因為代碼錯不影響「IP 是對的」這件事
+	def note_address(self):
+		global confirmed_address
+		if self.is_local():
+			return
+		address = self.connection.getsockname()[0]
+		if address != confirmed_address:
+			confirmed_address = address
+			print('已確認學生連得到這個 IP：' + address)
+
 	def send_json(self, status, value):
 		body = json.dumps(value, ensure_ascii=False).encode('utf-8')
 		self.send_response(status)
@@ -161,6 +195,7 @@ class ScoreHandler(http.server.BaseHTTPRequestHandler):
 			return None
 
 	def do_GET(self):
+		self.note_address()
 		if self.path == '/' or self.path == '/scoreboard.html':
 			with open(scoreboard_path, 'rb') as page_file:
 				body = page_file.read()
@@ -175,11 +210,14 @@ class ScoreHandler(http.server.BaseHTTPRequestHandler):
 			if self.is_local():
 				reply['code'] = data['code']
 				reply['addresses'] = find_addresses()
+				reply['confirmed_address'] = confirmed_address
+				reply['connected'] = connected_names
 			self.send_json(200, reply)
 		else:
 			self.send_error_message(404, '找不到這個網址。')
 
 	def do_POST(self):
+		self.note_address()
 		body = self.read_json()
 		if body is None:
 			self.send_error_message(400, '送過來的資料格式不對，請助教手動登記。')
@@ -198,7 +236,19 @@ class ScoreHandler(http.server.BaseHTTPRequestHandler):
 			if problem != '':
 				self.send_error_message(400, problem)
 				return
-			self.send_json(200, add_score(body['name'].strip(), body['score']))
+			name = body['name'].strip()
+			if not self.is_local():
+				add_connected(name)
+			self.send_json(200, add_score(name, body['score']))
+			return
+		if self.path == '/api/hello':
+			# 學生的「測試連線」：檢查和送分數一樣，通過就加進已連線名單，不登記分數
+			problem = check_player(body)
+			if problem != '':
+				self.send_error_message(400, problem)
+				return
+			add_connected(body['name'].strip())
+			self.send_json(200, {'result': 'ok'})
 			return
 
 		if not self.is_local():
@@ -218,6 +268,8 @@ class ScoreHandler(http.server.BaseHTTPRequestHandler):
 			data['records'] = []
 			data['code'] = make_match_code()
 			save_data()
+			# 換了比賽代碼，大家要重新填、重新測試，已連線名單也一起清空
+			connected_names.clear()
 			self.send_json(200, {'code': data['code']})
 		else:
 			self.send_error_message(404, '找不到這個網址。')
@@ -241,6 +293,7 @@ def main():
 	for address in find_addresses():
 		print('\tscore_server = \'' + address + '\'')
 	print('\tmatch_code = \'' + data['code'] + '\'')
+	print('列出好幾個 IP 時，拿一台學生電腦逐一試「測試連線」，連得到的那個會顯示在計分板上。')
 	print('第一次執行時 Windows 會問要不要允許 Python 連線，請勾選「私人網路」並允許。')
 	print('按 Ctrl + C 關閉。')
 	print()

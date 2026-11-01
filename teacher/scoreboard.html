@@ -8,6 +8,7 @@
 	官方比賽的計分板，有兩種用法：
 	1. 自動登記：執行 python teacher/score_server.py，再打開 http://localhost:8765。
 	   最上面會顯示學生要在 official.ipynb 填的 IP 和比賽代碼，學生每玩完一局，分數就自動出現。
+	   學生執行「測試連線」之後，名字會出現在「已連線」名單；這台電腦有好幾個 IP 時，第一台學生電腦連進來後只留下連得到的那個。
 	   資料存在伺服器旁邊的 teacher/scores.json。
 	2. 手動登記：用瀏覽器直接打開這個檔案，不需要網路。
 	   資料存在這台電腦的瀏覽器裡（localStorage），不小心重新整理或關掉也不會消失；
@@ -72,6 +73,36 @@
 		font-size: 30px;
 		text-align: center;
 		overflow-wrap: anywhere;
+	}
+
+	/* 小字的說明，例如「已確認學生連得到」，用一般字型，不用等寬字型 */
+	.connect-note {
+		margin-top: 6px;
+		color: var(--muted);
+		font-family: 'Microsoft JhengHei', 'PingFang TC', 'Noto Sans TC', sans-serif;
+		font-size: 20px;
+	}
+
+	/* ===== 已連線的學生 ===== */
+	.connected {
+		margin: 0 auto 20px;
+		max-width: 960px;
+		text-align: center;
+	}
+
+	.connected-title {
+		margin-bottom: 8px;
+		color: var(--muted);
+		font-size: 22px;
+	}
+
+	.connected-name {
+		display: inline-block;
+		margin: 4px;
+		padding: 4px 14px;
+		border-radius: 999px;
+		background: var(--panel);
+		font-size: 22px;
 	}
 
 	/* ===== 輸入區 ===== */
@@ -321,6 +352,7 @@
 	<h1>足球小恐龍排行榜<span class="badge">官方版本</span></h1>
 
 	<div class="connect" id="connect" hidden></div>
+	<div class="connected" id="connected" hidden></div>
 
 	<form class="entry" id="entry-form">
 		<input id="name-input" placeholder="名字（例如 #10 小明）" autocomplete="off">
@@ -432,26 +464,52 @@
 			}
 		}
 		records = reply.records;
-		show_connect_info(reply.addresses, reply.code);
+		show_connect_info(reply);
 		draw();
 	}
 
-	// 在最上面用大字寫出學生要填什麼，投影出來全班都看得到
-	function show_connect_info(addresses, code) {
+	// 在最上面用大字寫出學生要填什麼，投影出來全班都看得到；下面再列出已經測試連線成功的學生
+	function show_connect_info(reply) {
 		const connect = document.getElementById('connect');
+		const connected = document.getElementById('connected');
 		connect.innerHTML = '';
+		connected.innerHTML = '';
 		// 伺服器只把比賽代碼給它自己那台電腦；從別台電腦打開計分板時看不到，就不顯示
-		if (code === undefined) {
+		if (reply.code === undefined) {
 			connect.hidden = true;
+			connected.hidden = true;
 			return;
 		}
 		connect.hidden = false;
+		connected.hidden = false;
+
+		// 已經有學生電腦連進來過，就只顯示它連到的那個 IP；還沒有的話，列出所有可能的 IP
 		let server_text = '（找不到這台電腦的 IP，請檢查網路）';
-		if (addresses.length > 0) {
-			server_text = '\'' + addresses.join('\' 或 \'') + '\'';
+		let note = '';
+		if (reply.confirmed_address !== '') {
+			server_text = '\'' + reply.confirmed_address + '\'';
+			note = '✅ 已確認學生電腦連得到這個 IP';
+		} else if (reply.addresses.length === 1) {
+			server_text = '\'' + reply.addresses[0] + '\'';
+			note = '還沒有學生電腦連進來，請先找一台執行「測試連線」';
+		} else if (reply.addresses.length > 1) {
+			server_text = '\'' + reply.addresses.join('\' 或 \'') + '\'';
+			note = '還不確定是哪一個：找一台學生電腦逐一試「測試連線」，成功後這裡只會留下連得到的 IP';
 		}
 		connect.appendChild(make_element('div', '', 'score_server = ' + server_text));
-		connect.appendChild(make_element('div', '', 'match_code = \'' + code + '\''));
+		connect.appendChild(make_element('div', '', 'match_code = \'' + reply.code + '\''));
+		if (note !== '') {
+			connect.appendChild(make_element('div', 'connect-note', note));
+		}
+
+		if (reply.connected.length === 0) {
+			connected.appendChild(make_element('div', 'connected-title', '已連線：還沒有人'));
+			return;
+		}
+		connected.appendChild(make_element('div', 'connected-title', '已連線 ' + reply.connected.length + ' 人'));
+		for (const name of reply.connected) {
+			connected.appendChild(make_element('span', 'connected-name', name));
+		}
 	}
 
 	// ===== 加入分數 =====

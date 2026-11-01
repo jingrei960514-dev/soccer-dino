@@ -32,12 +32,12 @@
 | `soccer/checks.py` | 防呆：遊戲開始前檢查學生的設定，遊戲中把學生函式的錯誤翻譯成中文說明。所有給學生看的錯誤訊息都在這裡。 |
 | `soccer/drawing.py` | 所有畫圖的程式。每種角色一個 `draw_` 函式，先找 `assets/` 裡的圖檔，找不到才用幾何圖形。 |
 | `soccer/sound.py` | 音效：載入 `assets/` 裡的音效檔，找不到就用程式產生嗶聲；沒有喇叭時自動靜音。 |
-| `soccer/upload.py` | 官方模式結束一局時，把分數送到 `teacher/score_server.py`，回傳要畫在結束畫面上的結果。送不出去不會讓遊戲出錯。 |
+| `soccer/upload.py` | 官方模式結束一局時，把分數送到 `teacher/score_server.py`，回傳要畫在結束畫面上的結果。送不出去不會讓遊戲出錯。也負責比賽前的測試連線（`check_connection()`）。 |
 | `soccer/assets/` | 放圖片和音效的資料夾，檔名與大小寫在裡面的 `README.md`。空的也能玩。 |
 | `teacher/run.py` | 開發用的入口，讀出 notebook 裡的程式格直接執行，不用開 Jupyter。`python teacher/run.py` 執行 solution.ipynb，`python teacher/run.py game.ipynb` 執行其他 notebook。 |
 | `teacher/solution.ipynb` | 教師版 notebook，全部問題都已修好。也是破壞版的來源。 |
 | `game.ipynb` | 學生拿到的破壞版，由 `make_game_notebook.py` 產生，**不要直接修改**。 |
-| `official.ipynb` | 官方比賽用的 notebook，只設定球員和比賽登記（`score_server`、`match_code`），最後一格呼叫 `engine.run_official(globals())`。 |
+| `official.ipynb` | 官方比賽用的 notebook，只設定球員和比賽登記（`score_server`、`match_code`），「測試連線」那一格呼叫 `engine.test_connection(globals())`，最後一格呼叫 `engine.run_official(globals())`。 |
 | `teacher/make_game_notebook.py` | 從 solution.ipynb 產生 game.ipynb：找出特定的格子換成破壞版內容，並清除執行結果。 |
 | `teacher/clear_outputs.py` | 清除 notebook 的執行結果，交給學生之前執行。沒有指定檔案時，會清除最外層和 `teacher/` 裡所有的 notebook。 |
 | `teacher/scoreboard.html` | 官方比賽的計分板。由 `score_server.py` 提供時（網址是 `http://`）每兩秒向伺服器要一次名單；直接打開檔案時（`file://`）資料存在瀏覽器的 localStorage，只能手動輸入。 |
@@ -287,6 +287,7 @@ engine.run(globals())               engine.run_official(globals())
 
 ```
 學生電腦                                     老師電腦（teacher/score_server.py）
+upload.check_connection() ─ POST /api/hello ─→ 檢查比賽代碼、關卡種子，名字加進已連線名單
 upload.send_score()  ── POST /api/scores ──→  檢查比賽代碼、關卡種子、分數範圍
                                               只留最高分，存進 teacher/scores.json
 結束畫面顯示結果      ←── result、best ────    回覆 new / better / lower，或中文的錯誤理由
@@ -296,7 +297,9 @@ scoreboard.html（老師電腦的瀏覽器） ── 每兩秒 GET /api/scores �
 
 - 送出的名字是 `read_official_settings()` 組好的「#背號 名字」。
 - 送出的 `seed` 是 `config.official_seed`，伺服器拿自己的比對；學生改過 `config.py` 或拿到舊版，分數就不算。
-- 從 `127.0.0.1` 連進來的（也就是老師電腦上的計分板）才能手動加分、刪除、清除，以及拿到比賽代碼和 IP。
+- 從 `127.0.0.1` 連進來的（也就是老師電腦上的計分板）才能手動加分、刪除、清除，以及拿到比賽代碼、IP 和已連線名單。
+- 別台電腦連進來時，`note_address()` 用 `self.connection.getsockname()` 記下它連到的是這台電腦的哪個 IP（`confirmed_address`）。老師電腦有好幾張網卡時，計分板從此只顯示這一個。比賽代碼錯了也照記，因為 IP 本身是對的。
+- 已連線名單（`connected_names`）和 `confirmed_address` 只放在記憶體，不寫進 `scores.json`；「全部清除」會清空已連線名單。
 - 伺服器一次只處理一個連線，不用擔心兩筆分數同時寫檔；每個連線最多等 5 秒，有人卡住也不會拖住其他人。
 
 ## 為什麼這樣設計

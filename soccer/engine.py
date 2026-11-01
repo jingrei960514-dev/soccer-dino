@@ -165,6 +165,31 @@ def run_official(student_globals):
 	start_game(settings)
 
 
+# 官方比賽前的測試連線：official.ipynb 的「測試連線」那一格呼叫這個函式。
+# 不開遊戲視窗，只確認連得到計分板、比賽代碼和關卡都對，再把結果用中文印出來。
+def test_connection(student_globals):
+	if not can_start(student_globals):
+		return
+
+	problems = checks.check_player_settings(student_globals)
+	problems = problems + checks.check_upload_settings(student_globals)
+	if len(problems) > 0:
+		print_problems('【沒有測試】請先修正下面的問題：', problems)
+		return
+
+	settings = read_official_settings(student_globals)
+	if settings['score_server'] == '':
+		print('還沒有填 score_server 和 match_code，請照著投影幕上計分板顯示的內容填，再執行一次這一格。')
+		return
+
+	success, text = upload.check_connection(settings)
+	if success:
+		print('✅ ' + text)
+	else:
+		print('❌ ' + text)
+		print('檢查 score_server 和 match_code 有沒有抄錯，改好之後要先執行上面那一格，再執行這一格。')
+
+
 # 兩種模式開始前都要確認的兩件事：電腦有沒有 pygame、最後一格有沒有寫對。
 # 有問題就印出中文說明並回傳 False。這裡用 print 而不是丟出錯誤，學生才不會看到 traceback。
 def can_start(student_globals):
