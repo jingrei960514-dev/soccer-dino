@@ -43,11 +43,13 @@ title_cell = '''
 
 course_cell = '''
 # ===== 我的關卡 =====
-# 【問題一】關卡裡全部都是三角錐，好無聊！
-# 提示：把清單裡的一些 'cone' 換成其他名稱，可以用的名稱寫在上面的表格。
-course = ['cone', 'cone', 'cone', 'cone', 'cone']
-for i in range(3):
-	course.append('cone')
+# 【問題一】關卡一下就跑完了，而且全部都是三角錐，好無聊！
+# 關卡是用下面的迴圈排出來的，要修好它，就要改迴圈：
+# 1. range(2) 讓迴圈只跑 2 次，改大一點，關卡就會變長。
+# 2. 迴圈裡每一行 append 會加一個東西。多寫幾行 append，放其他名稱（看上面的表格）。
+# 注意：append 那幾行前面要有一個 tab 縮排，才會在迴圈裡面，每一圈都執行。
+course = []
+for i in range(2):
 	course.append('cone')
 '''
 

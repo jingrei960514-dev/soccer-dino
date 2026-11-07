@@ -227,7 +227,13 @@ def start_game(settings):
 	# 視窗才會真的關掉。在 Jupyter 裡如果沒關，下次執行會卡住或開不了新視窗。
 	# 注意這裡不能用 sys.exit()，那會把 Jupyter 的 kernel 一起關掉。
 	try:
-		screen = pygame.display.set_mode((config.screen_width, config.screen_height))
+		# SCALED：程式照樣用 960 x 480 畫，pygame 自動等比例放大到視窗或整個螢幕。
+		# 放大的方式要在開視窗之前用環境變數告訴 SDL（pygame 底下負責顯示的程式庫）
+		os.environ['SDL_RENDER_SCALE_QUALITY'] = config.scale_quality
+		flags = pygame.SCALED
+		if config.fullscreen:
+			flags = flags | pygame.FULLSCREEN
+		screen = pygame.display.set_mode((config.screen_width, config.screen_height), flags)
 		pygame.display.set_caption(config.window_title)
 		# pygame 2 預設會開啟「文字輸入」，切到中文輸入法時字母鍵會被輸入法拿去組字，
 		# 遊戲就收不到 R、W 這些按鍵。這個遊戲不需要打字，所以把它關掉。
@@ -532,6 +538,9 @@ def handle_events(game, settings):
 			continue
 		if event.key == config.quit_key:
 			return 'quit'
+		if event.key == config.fullscreen_key:
+			pygame.display.toggle_fullscreen()
+			continue
 		if event.key in config.restart_keys:
 			return 'restart'
 		# 遊戲結束後按跳躍鍵不應該再呼叫學生的函式

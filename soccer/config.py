@@ -15,6 +15,12 @@ screen_height = 480
 # 每秒畫幾張畫面；所有速度都是「每一幀移動幾像素」，所以改這個會讓整個遊戲變快或變慢
 fps = 60
 window_title = '足球小恐龍'
+# 開始遊戲時要不要全螢幕。遊戲內部永遠用上面的 960 x 480 來畫，
+# 再等比例放大到整個螢幕（兩邊多出來的地方補黑邊），所以不管螢幕多大，
+# 每個人看到的跑道長度都一樣，官方比賽才公平
+fullscreen = True
+# 放大時讓邊緣平滑；改成 'nearest' 會變成一格一格的像素風
+scale_quality = 'linear'
 
 # ===== 場地 =====
 # 地面的高度（從視窗上緣往下數）；球員和地上的障礙物都踩在這條線上
@@ -184,6 +190,8 @@ shoot_keys = [pygame.K_f, pygame.K_x]
 # 重新開始多放一個 Enter，萬一 R 被輸入法攔下來還有備案
 restart_keys = [pygame.K_r, pygame.K_RETURN]
 quit_key = pygame.K_ESCAPE
+# 在全螢幕和視窗之間切換
+fullscreen_key = pygame.K_F11
 
 # ===== 陰影 =====
 # 球員、障礙物、足球腳下的橢圓形陰影。陰影永遠貼在地面上，東西離地愈高，陰影愈小，

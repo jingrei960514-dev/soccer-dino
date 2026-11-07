@@ -6,8 +6,8 @@
 
 ## 課堂流程
 
-1. **試玩壞掉的版本**：跳不起來、撞到沒事、障礙物都一樣、畫面不會加速。
-2. **逐項修好**：由上到下有四個問題，第一個改關卡清單，其他三個是填空，把 `______` 換成正確的程式。
+1. **試玩壞掉的版本**：關卡太短又都是三角錐、跳不起來、撞到沒事、畫面不會加速。
+2. **逐項修好**：由上到下有四個問題，第一個改排關卡的迴圈，其他三個是填空，把 `______` 換成正確的程式。
 3. **改成自己的版本**：名字、球衣顏色、背號、關卡都可以改；做得快的同學挑戰二段跳和射門。
 4. **同學互玩**。
 5. **官方比賽**：大家玩同一個固定的關卡，分數自動登記到投影的計分板，每個人只留最高分。
@@ -16,7 +16,11 @@
 
 ```python
 # ===== 我的關卡 =====
-course = ['cone', 'gap', 'defender', 'ball', 'shoe']
+course = []
+for i in range(5):
+	course.append('cone')
+	course.append('gap')
+	course.append('ball')
 
 # ===== 遊戲規則 =====
 jump_power = 12
@@ -66,6 +70,7 @@ python teacher/score_server.py           開啟計分板伺服器，再打開 ht
 | F、X | 射門（挑戰題） |
 | R、Enter | 重新開始 |
 | Esc | 關閉視窗 |
+| F11 | 切換全螢幕和視窗 |
 
 ## 檔案
 
@@ -118,6 +123,7 @@ Soccer/
 | 想做的事 | 做法 |
 | --- | --- |
 | 改遊戲手感 | 只改 `soccer/config.py` |
+| 開視窗而不是全螢幕 | 把 `soccer/config.py` 的 `fullscreen` 改成 `False`，或遊戲中按 F11 |
 | 改 notebook 內容 | 改 `teacher/solution.ipynb`，再執行 `python teacher/make_game_notebook.py` 重新產生 `game.ipynb` |
 | 改錯誤訊息的用語 | 改 `soccer/checks.py`，並同步更新 `teacher/TEACHER_GUIDE.md` |
 | 換一套官方關卡 | 改 `soccer/config.py` 的 `official_seed` |

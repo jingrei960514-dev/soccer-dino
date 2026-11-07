@@ -64,7 +64,7 @@ Jupyter 有一個要注意的地方：kernel 會記住所有執行過的東西�
 | --- | --- |
 | `教師版` | 學生版的開頭說明，告訴學生有【問題一】到【問題四】 |
 | `from soccer import engine` | 只有 `from soccer import engine` 一行的載入格（學生版和 `soccer` 放在同一層，不用改搜尋路徑） |
-| `# ===== 我的關卡 =====` | 【問題一】全部都是 `'cone'` 的清單 |
+| `# ===== 我的關卡 =====` | 【問題一】只跑 2 圈、每圈只加一個 `'cone'` 的迴圈 |
 | `def on_jump_key` | 【問題二】挖空版：`if game.______:`、`game.vy = ______` |
 | `def on_hit` | 【問題三】挖空版：命、結束條件、`game.______()` 三個空格 |
 | `def on_tick` | 【問題四】挖空版：`game.speed = ______` |
@@ -178,7 +178,7 @@ engine.run(globals())               engine.run_official(globals())
 
 `play_one_round()` 裡的 `while True` 每跑一圈就是一幀（每秒 60 幀）：
 
-1. `handle_events()`：讀鍵盤與關閉視窗。按跳躍鍵就呼叫學生的 `on_jump_key`，按射門鍵就呼叫 `on_shoot_key`；按 Esc 或關閉視窗就結束；按 R 或 Enter 重新開始。
+1. `handle_events()`：讀鍵盤與關閉視窗。按跳躍鍵就呼叫學生的 `on_jump_key`，按射門鍵就呼叫 `on_shoot_key`；按 Esc 或關閉視窗就結束；按 R 或 Enter 重新開始；按 F11 切換全螢幕。
 2. 如果遊戲還沒結束，`update_game()` 依序做（官方模式會用內建規則取代學生函式）：
 	1. 計時，每滿一秒呼叫學生的 `on_tick`。
 	2. 用 `keep_in_range()` 把 `speed`、`vy` 拉回合理範圍，防止學生設的極端數值讓遊戲壞掉。
